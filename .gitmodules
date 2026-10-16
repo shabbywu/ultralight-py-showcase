@@ -1,0 +1,3 @@
+[submodule "examples/emberkeep"]
+	path = examples/emberkeep
+	url = https://github.com/shabbywu/emberkeep.git
