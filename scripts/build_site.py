@@ -14,7 +14,7 @@ def project_card(project):
     def value(key):
         return escape(project[key], quote=True)
     if project.get('image'):
-        visual = f'<img src="{value("image")}" alt="Emberkeep 原生运行截图：像素地牢与游戏状态界面" width="1280" height="800" loading="lazy">'
+        visual = f'<img src="{value("image")}" alt="{escape(project.get("image_alt", project["title"] + " 原生运行截图"), quote=True)}" width="1280" height="800" loading="lazy">'
     else:
         visual = '<div class="lab-art"><div class="label">BRIDGE LAB / 设计目标 · 非运行结果</div><div class="comment">// JavaScript → Python</div><div>const value = <strong>lab.add</strong>(20, 22);</div><div>print(value);</div><br><div class="comment">// 六个场景，观察真实桥接行为</div><div>Functions · Promises · Objects</div></div>'
     tags = ''.join(f'<li>{escape(tag)}</li>' for tag in project['features'])

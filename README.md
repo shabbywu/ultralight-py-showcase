@@ -5,7 +5,7 @@ ultralight-py 的示例展示站与源码入口，展示 Python 逻辑与 JavaSc
 | 示例 | 状态 | 源码组织 |
 | --- | --- | --- |
 | [Emberkeep](https://github.com/shabbywu/emberkeep) | 已实现：像素 roguelike | `examples/emberkeep`，固定版本的 submodule |
-| [Bridge Lab](examples/bridge-lab/README.md) | 规划中：交互式桥接实验室 | 预留 `examples/bridge-lab`，后续在本仓库开发 |
+| [Bridge Lab](examples/bridge-lab/README.md) | P0 已实现：六个真实桥接实验 | `examples/bridge-lab`，含原生冒烟测试与中文指南 |
 
 展示站是静态页面。原生示例需要桌面环境，其依赖、运行和验证说明由各项目独立维护。
 
@@ -34,7 +34,7 @@ git submodule update --init --recursive
 site/                       页面模板、项目清单、展示素材及许可
 scripts/build_site.py       网站生成与本地链接校验
 examples/emberkeep/         独立上游仓库 submodule
-examples/bridge-lab/        桥接实验室项目计划
+examples/bridge-lab/        可运行桥接实验室、测试与中文指南
 docs/ROADMAP.md             公开路线图
 .github/workflows/pages.yml 构建与部署
 ```

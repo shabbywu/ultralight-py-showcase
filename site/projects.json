@@ -13,20 +13,25 @@
     "source": "https://github.com/shabbywu/emberkeep",
     "image": "assets/emberkeep.png",
     "guide": "https://github.com/shabbywu/emberkeep#run",
-    "releases": "https://github.com/shabbywu/emberkeep/releases"
+    "releases": "https://github.com/shabbywu/emberkeep/releases",
+    "image_alt": "Emberkeep 原生运行截图：像素地牢与游戏状态界面"
   },
   {
     "id": "bridge-lab",
     "title": "Ultralight Bridge Lab",
-    "status": "规划中",
-    "kind": "桥接实验室 / 待开发",
-    "description": "计划通过六个可编辑、可观察的实验，探索同步调用、异步 Promise、对象与容器代理、异常传播和字典快照。",
+    "status": "P0 已实现",
+    "kind": "交互式桥接实验室 / AppCore",
+    "description": "在原生桌面窗口中编辑并执行 JavaScript，真实调用 Python。六个实验覆盖同步函数、asyncio Promise、实例属性、实时 list 代理、异常传播与 dict 快照；控制台和状态检查器呈现实际输出。",
     "features": [
-      "六个桥接场景",
-      "JS 编辑器",
-      "Console / Inspector"
+      "六个真实桥接场景",
+      "可编辑 JS / 只读 Python 源码",
+      "Console / Inspector",
+      "原生 GPU / CPU 冒烟通过"
     ],
     "source": "https://github.com/shabbywu/ultralight-py-showcase/tree/main/examples/bridge-lab",
-    "source_label": "查看项目计划"
+    "source_label": "查看源码",
+    "image": "assets/bridge-lab.png",
+    "image_alt": "Bridge Lab 原生运行截图：可编辑 JS、实际 Python 源码、Counter 从 0 增至 2 的日志与状态检查器",
+    "guide": "https://github.com/shabbywu/ultralight-py-showcase/tree/main/examples/bridge-lab#readme"
   }
 ]
