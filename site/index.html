@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="ultralight-py 示例集：探索 Python 逻辑、JavaScript 界面与原生桌面的结合。">
+  <title>ultralight-py · Showcase</title>
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<a class="skip" href="#projects">跳到示例</a>
+<header class="bar"><a class="brand" href="./">u<span>l</span> / ultralight-py</a><nav aria-label="主导航"><a href="#projects">示例集</a><a href="#develop">参与开发</a><a href="https://github.com/shabbywu/ultralight-py-showcase">GitHub ↗</a></nav></header>
+<main>
+<section class="hero"><p class="eyebrow">THE SHOWCASE / PYTHON × JAVASCRIPT</p><h1>Python 的能力，<br><span>Web 的表达。</span></h1><p class="lead">从像素地牢到桥接实验室，探索 ultralight-py 如何让 Python 逻辑与 JavaScript 界面在原生桌面窗口中协作。</p><div class="actions"><a class="button" href="#projects">探索示例 ↓</a><a class="text-link" href="https://github.com/shabbywu/ultralight-py">了解 ultralight-py ↗</a></div><div class="stack"><span>Python objects</span><b>↔</b><span>JavaScript UI</span><b>→</b><span>Native desktop</span></div></section>
+<section id="projects"><div class="section-head"><div><p class="eyebrow">01 / EXPLORE</p><h2>示例集</h2></div><p>读源码 · 看实现 · 本地运行</p></div><p class="note">这里是静态展示站。原生 Python ↔ JS 桥接需要在桌面应用中运行；截图与项目介绍用于了解示例。</p>
+<!-- PROJECTS -->
+</section>
+<section id="develop" class="develop"><div><p class="eyebrow">02 / BUILD SOMETHING</p><h2>下一个示例，<br>从这里开始。</h2><p>已有独立仓库的示例以 submodule 接入；与展示站一起维护的示例放在 examples/ 下。每个项目保留自己的依赖、测试与运行说明。</p><a class="text-link" href="https://github.com/shabbywu/ultralight-py-showcase/blob/main/CONTRIBUTING.md">查看接入约定 ↗</a></div><div class="code"><span>获取展示站与示例源码</span><pre><code>git clone --recurse-submodules \
+  https://github.com/shabbywu/ultralight-py-showcase.git
+cd ultralight-py-showcase
+
+# 本地预览展示站（Python 3.10+）
+python scripts/build_site.py
+python -m http.server 8000 --directory dist</code></pre></div></section>
+</main><footer><span>ultralight-py / Showcase</span><span>Python objects. JavaScript UI. Native desktop.</span><a href="assets/emberkeep-LICENSE.txt">Emberkeep 截图许可 · MIT</a></footer>
+</body></html>

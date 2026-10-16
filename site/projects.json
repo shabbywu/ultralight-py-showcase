@@ -1,0 +1,32 @@
+[
+  {
+    "id": "emberkeep",
+    "title": "Emberkeep",
+    "status": "已实现",
+    "kind": "桌面游戏 / submodule",
+    "description": "提着灯笼探索地牢。Python 驱动回合规则、战斗与存档，Canvas 和 Alpine.js 呈现像素世界。",
+    "features": [
+      "实时对象代理",
+      "asyncio / Promise",
+      "Canvas + Alpine.js"
+    ],
+    "source": "https://github.com/shabbywu/emberkeep",
+    "image": "assets/emberkeep.png",
+    "guide": "https://github.com/shabbywu/emberkeep#run",
+    "releases": "https://github.com/shabbywu/emberkeep/releases"
+  },
+  {
+    "id": "bridge-lab",
+    "title": "Ultralight Bridge Lab",
+    "status": "规划中",
+    "kind": "桥接实验室 / 待开发",
+    "description": "计划通过六个可编辑、可观察的实验，探索同步调用、异步 Promise、对象与容器代理、异常传播和字典快照。",
+    "features": [
+      "六个桥接场景",
+      "JS 编辑器",
+      "Console / Inspector"
+    ],
+    "source": "https://github.com/shabbywu/ultralight-py-showcase/tree/main/examples/bridge-lab",
+    "source_label": "查看项目计划"
+  }
+]
