@@ -1,5 +1,6 @@
 import asyncio
 from .models import Counter
+from .playground import Playground
 
 
 def add(a: int, b: int) -> int:
@@ -25,8 +26,9 @@ def get_profile():
     return {"name": "Bridge Lab", "version": "1.0", "tags": ["python", "js"]}
 
 
-def register_api(api):
+def register_api(api, *, playground=None):
     counter = Counter()
+    playground = playground if playground is not None else Playground()
 
     def reset_counter() -> int:
         return counter.reset()
@@ -36,6 +38,7 @@ def register_api(api):
 
     for function in (add, delayed_double, divide, get_profile, reset_counter, get_status):
         api.register(function)
+    api.register(playground.run_python)
     api.register_object("counter", counter,
                         members=["value", "history", "increment", "reset"])
     return counter

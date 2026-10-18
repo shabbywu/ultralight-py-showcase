@@ -19,7 +19,7 @@ def test_registration_and_independence():
     api, other = Registry(), Registry()
     counter = register_api(api)
     independent = register_api(other)
-    assert set(api.functions) == {'add','delayed_double','divide','get_profile','reset_counter','get_status'}
+    assert set(api.functions) == {'add','delayed_double','divide','get_profile','reset_counter','get_status','run_python'}
     assert inspect.iscoroutinefunction(api.functions['delayed_double'])
     assert api.objects['counter'] == (counter,['value','history','increment','reset'])
     counter.increment(3)
@@ -28,3 +28,10 @@ def test_registration_and_independence():
     assert api.functions['reset_counter']() == 0
     assert len(python_sources()) == 6
     assert 'return a + b' in python_sources()[0]
+
+
+def test_python_module_registration():
+    api = Registry()
+    register_api(api)
+    py = api.functions['run_python']('def arbitrary_name(a, b):\n    return a + b')
+    assert py.arbitrary_name(20, 22) == 42

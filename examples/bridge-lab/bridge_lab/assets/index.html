@@ -2,10 +2,10 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' file:; script-src 'self' file: 'unsafe-eval'; style-src 'self' file:; connect-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
 <title>Ultralight Bridge Lab</title><link rel="stylesheet" href="style.css">
 <header><b>✦ BRIDGE LAB</b><span>Python 对象 · JavaScript UI · 原生桌面</span><small>ultralight-py 0.5.0</small></header>
-<main><nav aria-label="桥接案例"><h3>探索真实桥接</h3><div id="cases"></div><p>仅运行本地可信 JS。<br>这不是安全沙箱。</p></nav>
+<main><nav aria-label="桥接案例"><h3>探索真实桥接</h3><div id="cases"></div><p>Python × JavaScript<br>修改两端代码，即刻运行。</p></nav>
 <section class="workspace"><h1 id="title">加载中</h1><p id="expected"></p><div class="toolbar"><button id="run" disabled>▶ 运行 ⌘/Ctrl+Enter</button><button id="reset" disabled>重置 / 恢复示例</button><button id="copy">复制 JS</button></div>
-<label for="editor">JavaScript · 可编辑</label><textarea id="editor" spellcheck="false"></textarea><p class="hint">每次运行前重置 Python Counter；切换保留各案例草稿。</p>
-<div class="toolbar"><label for="source">Python · 实际注册源码（只读）</label><button id="copyPython">复制 Python</button></div><textarea id="source" readonly spellcheck="false"></textarea></section>
+<label for="editor">JavaScript · 可编辑</label><textarea id="editor" spellcheck="false"></textarea><p class="hint">每次运行重新加载 Python 模块；切换保留两端草稿。</p>
+<div class="toolbar"><label id="sourceLabel" for="source">Python · 可编辑 · 运行时先加载</label><button id="copyPython">复制 Python</button></div><textarea id="source" spellcheck="false"></textarea><p id="pythonHint" class="hint">修改 Python 后点击运行，JS 通过 lab 访问公开函数与对象。</p></section>
 <aside><h3>状态检查器</h3><pre id="inspector">Bridge 等待中</pre><div class="toolbar"><h3>控制台</h3><button id="clear">清空</button></div><div id="logs" role="log" aria-live="polite"></div></aside></main>
 <footer id="status">正在检查真实 Bridge…</footer>
 <script src="samples.js"></script><script src="sources.js"></script><script src="app.js"></script></html>

@@ -21,17 +21,17 @@
     "title": "Ultralight Bridge Lab",
     "status": "P0 已实现",
     "kind": "交互式桥接实验室 / AppCore",
-    "description": "在原生桌面窗口中编辑并执行 JavaScript，真实调用 Python。六个实验覆盖同步函数、asyncio Promise、实例属性、实时 list 代理、异常传播与 dict 快照；控制台和状态检查器呈现实际输出。",
+    "description": "六个案例均可同时编辑 Python 与 JavaScript，在原生桌面窗口中运行。支持普通 Python 导入、函数、类和异步代码，真实探索函数调用、Promise、对象与容器代理、异常和快照。",
     "features": [
-      "六个真实桥接场景",
-      "可编辑 JS / 只读 Python 源码",
+      "六个双端可编辑案例",
+      "Python 导入 / 函数 / 类 / asyncio",
       "Console / Inspector",
       "原生 GPU / CPU 冒烟通过"
     ],
     "source": "https://github.com/shabbywu/ultralight-py-showcase/tree/main/examples/bridge-lab",
     "source_label": "查看源码",
     "image": "assets/bridge-lab.png",
-    "image_alt": "Bridge Lab 原生运行截图：可编辑 JS、实际 Python 源码、Counter 从 0 增至 2 的日志与状态检查器",
+    "image_alt": "Bridge Lab 原生截图：六个案例均支持 Python 与 JavaScript 双端编辑，控制台展示真实桥接结果",
     "guide": "https://github.com/shabbywu/ultralight-py-showcase/tree/main/examples/bridge-lab#readme"
   }
 ]

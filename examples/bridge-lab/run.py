@@ -11,6 +11,7 @@ import tempfile
 import traceback
 from bridge_lab.bridge import register_api
 from bridge_lab.fixtures import python_sources
+from bridge_lab.playground import Playground
 
 async def verify(view, screenshot=None):
     await view.wait_settled(timeout=15)
@@ -28,17 +29,17 @@ async def verify(view, screenshot=None):
             assert result['output'] == expected, result
         return result
     await case(0,['42'])
-    await case(0,['52'],'print(lab.add(30,22));')
+    await case(0,['52'],'print(py.add(30,22));')
     await case(1,['request started','result: 42'])
     await case(2,['before: 0','after: 2'])
-    assert view.evaluate('lab.counter.value') == 2
+    assert view.evaluate('BridgeLab.python.counter.value') == 2
     await case(3,['length: 1','last: 7','snapshot: [7]'])
     error = await case(4)
     assert len(error['output']) == 1 and 'zero' in error['output'][0].lower(),error
     await case(5,['name: Bridge Lab','is plain JS: true','{"name":"Bridge Lab","version":"1.0","tags":["python","js"]}'])
-    await case(0,code='lab.divide(1,0);',failure=True)
-    await case(1,code='await lab.delayed_double(21,2001);',failure=True)
-    await case(0,['42'],'print(lab.add(20,22));')
+    await case(4,code='lab.divide(1,0);',failure=True)
+    await case(1,code='await py.delayed_double(21,2001);',failure=True)
+    await case(0,['42'],'print(py.add(20,22));')
     view.evaluate('BridgeLab.select(1); BridgeLab.reset(); window.pendingRun=BridgeLab.run(); void 0')
     assert view.evaluate('BridgeLab.busy && document.getElementById("run").disabled')
     assert view.evaluate('BridgeLab.select(2) === false && BridgeLab.reset() === false')
@@ -51,8 +52,48 @@ async def verify(view, screenshot=None):
     await case(0,code='for(let i=0;i<310;i++) console.warn("x".repeat(4100));')
     assert view.evaluate('BridgeLab.logs.length') == 300
     assert view.evaluate('BridgeLab.logs.every(x=>x.message.length<=4000)')
+    # Every original example supports arbitrary module code and JS edits.
+    sources = python_sources()
+    for index in range(6):
+        view.evaluate(f'BridgeLab.select({index})')
+        assert view.evaluate('!document.getElementById("source").readOnly')
+        source = sources[index] + '\ndef user_function(value):\n    return value * 3\n'
+        view.evaluate('document.getElementById("source").value='+json.dumps(source))
+        await case(index, ['21'], 'print(lab.user_function(7));')
+        view.evaluate('BridgeLab.reset()')
+    custom = """import asyncio
+from dataclasses import dataclass
+
+@dataclass
+class Greeter:
+    prefix: str = 'hello'
+    def greet(self, name):
+        return f'{self.prefix} {name}'
+
+greeter = Greeter()
+
+def square(value):
+    result = value ** 2
+    return result
+
+async def greet_later(name):
+    await asyncio.sleep(0.01)
+    return greeter.greet(name)
+"""
+    view.evaluate('BridgeLab.select(0)')
+    view.evaluate('document.getElementById("source").value='+json.dumps(custom))
+    await case(0, ['49', 'hello Bridge Lab', 'hello desktop'],
+               "print(lab.square(7)); print(lab.greeter.greet('Bridge Lab')); print(await lab.greet_later('desktop'));")
+    view.evaluate('BridgeLab.select(1); BridgeLab.select(0)')
+    assert view.evaluate('document.getElementById("source").value') == custom
+    await case(0, ['49'], 'print(lab.square(7));')
+    view.evaluate('document.getElementById("source").value="def broken(:"')
+    await case(0, [], failure=True)
+    assert view.evaluate('BridgeLab.python.square(7)') == 49
+    view.evaluate('BridgeLab.reset()')
+    await case(0, ['42'])
     if screenshot:
-        view.evaluate('document.getElementById("clear").click(); BridgeLab.select(2); BridgeLab.reset()')
+        view.evaluate('document.getElementById("clear").click(); BridgeLab.select(0); BridgeLab.reset()')
         await view.evaluate_async('BridgeLab.run()')
         await asyncio.sleep(0.2)
         image = view.copy_pixels().to_rgba()
@@ -83,8 +124,8 @@ def main():
         resources={p.name:Resource(p.read_bytes(),mime[p.name.rsplit('.',1)[-1]]) for p in assets.iterdir() if p.is_file()}
         resources['sources.js']=Resource(('window.PYTHON_SOURCES='+json.dumps(python_sources())+';').encode(),'text/javascript')
         with tempfile.TemporaryDirectory(prefix='bridge-lab-') as state:
-            with API('lab') as api, Application(resource_loader=resources.get,cache_path=state,app_name='UltralightBridgeLab',force_cpu_renderer=args.cpu or bool(args.screenshot)) as app:
-                register_api(api)
+            with Playground() as playground, API('lab') as api, Application(resource_loader=resources.get,cache_path=state,app_name='UltralightBridgeLab',force_cpu_renderer=args.cpu or bool(args.screenshot)) as app:
+                register_api(api, playground=playground)
                 window=app.create_window(1280,800,title='Ultralight Bridge Lab')
                 api.attach(window.view)
                 window.view.load_url('file:///index.html')
