@@ -10,7 +10,7 @@
 
 ## 展示入口
 
-编辑 `site/projects.json`：填写唯一 `id`、`title`、`status`、`kind`、`description`、`features`、`source`。可选 `source_label`、`image`、`guide`（运行指南）、`releases`（发行页面）。
+编辑 `site/projects.json`：填写唯一 `id`、`title`、`status`、`kind`、`description`、`features`、`source`。可选 `source_label`、`image`、`image_alt`（截图替代文字）、`guide`（运行指南）、`releases`（发行页面）。
 
 图片放入 `site/assets/`，保留许可；页面内部使用相对链接，以兼容 GitHub Pages 项目子路径。新增项目时同时检查模板中的配图与替代文字是否适用。
 

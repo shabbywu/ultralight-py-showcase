@@ -1,10 +1,12 @@
 # Ultralight Bridge Lab
 
-用 AppCore 原生窗口探索真实 Python ↔ JavaScript 桥接。已实现 FR-01～FR-08、六个 P0 示例及中文编辑界面；运行输出全部由 ultralight-py 0.5.0 计算。无需浏览器、Node、CDN 或 Python Web 服务。
+在 AppCore 原生窗口中同时编辑 Python 与 JavaScript，运行六类真实桥接示例：同步函数、asyncio Promise、实例、list 代理、异常和 dict 快照。使用 Python 3.10+ 与 ultralight-py==0.5.0，无需浏览器、Node 或 Web 服务。
 
-![真实 AppCore CPU 窗口渲染截图](docs/screenshots/bridge-lab.png)
+![实际 AppCore 窗口截图](docs/screenshots/bridge-lab.png)
 
-从仓库根目录开始（Python 3.10+，需要该版本支持的系统 wheel 和桌面环境）：
+## 安装与运行
+
+需要受支持的系统 wheel 和桌面环境。安装完成后运行无需联网。
 
 ```sh
 cd examples/bridge-lab
@@ -12,34 +14,50 @@ python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 python -m pip install -e '.[test]'
 python run.py
-python run.py --cpu
-python run.py --smoke --smoke-report result.json
-python -m pytest -q
-BRIDGE_LAB_NATIVE=1 python -m pytest -q  # 包含真实原生子进程测试
 ```
 
-安装需要下载依赖；安装完成后资源均在包内，运行不依赖网络。`python -m pip install -e .` 只安装运行依赖，测试额外安装 `.[test]`。Windows 可用 PowerShell `$env:BRIDGE_LAB_NATIVE='1'` 启用原生测试。
+GPU 启动失败可用 `python run.py --cpu`。只需运行时可安装 `-e .`，不含测试依赖。
 
-左侧切换六个案例。修改 JS 后按运行或 Ctrl/Cmd+Enter；Tab 输入两个空格，支持系统选择、复制、粘贴和撤销。Python 面板只读，内容通过 `inspect.getsource` 从实际注册实现生成。复制按钮复制对应面板；不可用时可手动选中复制。运行前与切换案例时复位后端 Counter；切换保存各案例 JS 草稿，只有“重置 / 恢复示例”恢复默认文本。运行期间禁止重复运行、切换和重置。
+## 编辑与桥接
 
-`lab.add` 为同步调用；`lab.delayed_double` 返回 Promise，校验整数和 0–2000ms 边界，使用 AppCore 共享 asyncio。`lab.counter` 是长期存在的真实实例，只开放 value、history、increment、reset。list/dict 为 Python 代理：索引用 `Python.getitem`，长度用 `Python.len`，先 `Python.to_value` 再 JSON 序列化或交给 UI 状态管理。快照修改不写回 Python。另有 reset_counter、divide、get_profile、get_status；不存在任意 Python eval/exec 入口。
+六个案例的两端代码均可编辑。点击运行或 Ctrl/Cmd+Enter，先将 Python 编译、执行为新模块，再运行 JS；JS 通过局部 `lab`（别名 `py`）访问模块的公开函数和对象。支持正常 Python 导入、多个函数、类、异步代码及本机文件访问。
 
-Runner 包装可信 JS 为 async 函数，注入 print 和 console.log/warn/error；显式 return 也会显示。异常记录消息及堆栈，失败后恢复按钮。日志记录时间、run ID、案例、级别及完成耗时，最多 300 条、每条 4000 字符。Inspector 读取真实 Proxy/API。
+例如将 Python 改为：
 
-API 核验与规格修订：固定使用安装包 0.5.0 的实现，参考[官方 AppCore 示例](https://github.com/shabbywu/ultralight-py/blob/main/examples/appcore.py)。核心 register/register_object/attach 契约一致。`wait_until` 需要 Python callable，不能传 JS 字符串；原生测试先 `wait_settled` 再检查 ready，避免加载中提前 evaluate 触发桥接上下文冲突。规格称“7 个 API 入口”实际为 6 个函数加 1 个 counter 对象，按表格实现。资源放入 `bridge_lab/assets` 以确保安装后也能读取；sources.js 动态生成以避免源码副本漂移。
+```python
+import asyncio
 
-所有 Runtime/View 操作均在主线程。仅 app.run / run_async 驱动，不额外调用 Runtime.update。API/Application 上下文负责关闭与取消桥接任务，pagehide 使页面输出失效。测试使用临时缓存目录，超时或断言失败返回非 0，并写入报告。
+async def square(value):
+    await asyncio.sleep(0.1)
+    return value ** 2
+```
 
-这是可信本地代码实验室，**不是安全沙箱**。不运行他人的脚本；不提供 Python REPL、文件系统、进程执行能力。页面 CSP 禁止连接、外部框架与表单；资源 loader 只服务精确文件白名单。用户自己修改的 JS 可以阻塞主线程，死循环无法由 UI 中断，需要结束进程。
+JS 改为 `print(await lab.square(7));`，得到真实结果 `49`。
 
-默认 1280×800；宽度低于 1000px 后检查器移到下方。CSS 最小内容宽度 580px，小窗口滚动；0.5.0 create_window 未提供最小尺寸参数，因此不虚构原生最小窗口限制。
+- 每次运行重新初始化模块状态；切换保留两端草稿，重置恢复当前默认代码，退出后丢弃草稿。
+- Python 编译或加载失败时不执行 JS，并保留上一版模块；已发生的文件写入等外部副作用不回滚。
+- Python `print` 输出到启动终端；JS `print`、`console.log/warn/error` 输出到界面，日志最多 300 条、每条 4000 字符。
+- Python list/dict 为代理：用 `Python.getitem`、`Python.len` 访问；先 `Python.to_value` 再 JSON 序列化。快照修改不写回 Python。
+- Inspector 读取当前模块的 `counter.value/history`，未定义时显示空值。以 `_` 开头的名称遵循绑定库私有成员规则，不自动导出。
+- 支持双端复制、系统编辑快捷键与 Tab 缩进；运行期间锁定编辑、切换和重复运行。
 
-实测 macOS ARM64 / Python 3.14.6，GPU 与 CPU 冒烟通过；Windows x64、Linux x64（glibc ≥2.34）、Python 3.10–3.13 未在本次验证。没有 GUI 或可用 wheel 时，默认 pytest 明确跳过原生测试，不能当作原生通过。完整结果、手工待验项目见 [VALIDATION.md](docs/VALIDATION.md)。
-
-常见问题：若 GPU 启动失败，试 `--cpu`；ready 超时请检查终端异常及是否安装 0.5.0；`textAreaResizeCorner` 平台资源警告不影响本次验证的桥接。截图可重现：
+## 测试与截图
 
 ```sh
+python -m pytest -q                         # 默认跳过原生测试
+BRIDGE_LAB_NATIVE=1 python -m pytest -q      # 包含 AppCore 子进程
+python run.py --smoke --smoke-report result.json
 python run.py --cpu --smoke --screenshot docs/screenshots/bridge-lab.png
 ```
 
-截图来自真实 AppCore View 像素，未绘制模拟结果。P1 主动推送、导航恢复展示、日志导出、PyInstaller 和发行流水线未实现。IME、剪贴板、原生手动关闭与多显示器仍需人工验收。Ultralight SDK 与 Python 绑定遵守各自许可，商业分发需独立核验 SDK 授权。
+Windows PowerShell 用 `$env:BRIDGE_LAB_NATIVE='1'` 启用原生测试。冒烟测试自动退出，成功返回 0，失败非 0；截图来自真实 AppCore View 像素。报告按需生成，不纳入仓库。
+
+2026-10-18 实测 macOS ARM64 / Python 3.14.6，GPU、CPU 原生冒烟通过；仓库全量测试 150 项通过。覆盖六个默认案例、双端修改、任意函数/类/导入/async、错误恢复、草稿、运行锁和日志上限。Windows/Linux、其他 Python 版本及 IME、剪贴板、多显示器尚未逐项验证。
+
+## 实现与限制
+
+所有 Runtime/View 操作在主线程，由 AppCore run/run_async 驱动；加载模块不重绑 API、不重入 evaluate，退出时清理动态模块、源码缓存与原生资源。代码在当前桌面进程执行，阻塞操作会阻塞 UI，退出语句会退出进程。
+
+已按 0.5.0 安装源码与[官方 AppCore 示例](https://github.com/shabbywu/ultralight-py/blob/main/examples/appcore.py)核验：`wait_until` 接受 callable，检查 ready 前先等 `wait_settled`；ModuleType/SimpleNamespace 的动态成员无法直接被发现，因此用普通实例共享模块字典，导出真实对象代理。相对最初规格，Python 面板已全部改为可编辑，新增 `window.lab.run_python` 加载入口；JS 执行上下文中的 `lab` 指向本轮模块。
+
+默认 1280×800，小于 1000px 时 Inspector 移到下方；内容最小宽度 580px，其余滚动。主动推送、导航恢复展示、日志导出与发行打包未实现。Ultralight SDK 和绑定遵守各自许可，商业分发需核验 SDK 授权。

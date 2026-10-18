@@ -5,7 +5,7 @@ ultralight-py 的示例展示站与源码入口，展示 Python 逻辑与 JavaSc
 | 示例 | 状态 | 源码组织 |
 | --- | --- | --- |
 | [Emberkeep](https://github.com/shabbywu/emberkeep) | 已实现：像素 roguelike | `examples/emberkeep`，固定版本的 submodule |
-| [Bridge Lab](examples/bridge-lab/README.md) | P0 已实现：六个真实桥接实验 | `examples/bridge-lab`，含原生冒烟测试与中文指南 |
+| [Bridge Lab](examples/bridge-lab/README.md) | 已实现：六个 Python/JS 双端编辑桥接实验 | `examples/bridge-lab`，含原生冒烟测试与中文指南 |
 
 展示站是静态页面。原生示例需要桌面环境，其依赖、运行和验证说明由各项目独立维护。
 
@@ -35,7 +35,6 @@ site/                       页面模板、项目清单、展示素材及许可
 scripts/build_site.py       网站生成与本地链接校验
 examples/emberkeep/         独立上游仓库 submodule
 examples/bridge-lab/        可运行桥接实验室、测试与中文指南
-docs/ROADMAP.md             公开路线图
 .github/workflows/pages.yml 构建与部署
 ```
 
@@ -49,6 +48,6 @@ docs/ROADMAP.md             公开路线图
 
 ## 维护
 
-参见 [接入约定](CONTRIBUTING.md) 与 [路线图](docs/ROADMAP.md)。本地开发参考文件不作为网站内容或构建输入。
+新增或更新示例参见 [接入指南](CONTRIBUTING.md)；运行、测试与平台验证说明见各示例 README。
 
 Emberkeep 展示截图来自对应示例，遵循其 [MIT 许可](site/assets/emberkeep-LICENSE.txt)。各示例和第三方组件保留自身许可；本站新增代码尚未指定统一许可。
