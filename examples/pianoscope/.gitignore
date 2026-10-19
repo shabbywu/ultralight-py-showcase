@@ -18,3 +18,13 @@ dist/
 !/docs/samples/v11/first-light.musicxml
 !/docs/samples/v11/edge-phrase.pdf
 !/docs/samples/v11/edge-phrase.musicxml
+
+# Selected original v2 deliverables only; machine evidence stays at repo .tmp.
+!/docs/screenshots/v2-score-800.png
+!/docs/screenshots/v2-roll-800.png
+!/docs/samples/v2/
+/docs/samples/v2/*
+!/docs/samples/v2/first-light.pdf
+!/docs/samples/v2/first-light.musicxml
+!/docs/samples/v2/first-light.mid
+!/docs/samples/v2/first-light.mapping.json
