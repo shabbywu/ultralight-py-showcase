@@ -12,7 +12,7 @@
 
 ## 曲目、截图与字体
 
-v1.1 历史 MIDI 演示及测试夹具由原 generate_demos.py／generate_fixtures.py 生成，源码在基线 757443f 可查，原创编排采用 MIT；相关 MIDI 产品入口和 hands sidecar 已退役。v2 的“初光”和“回环与晨光”由 [generate_v2_fixtures.py](tools/generate_v2_fixtures.py) 直接编写 MusicXML；指法与连奏符号夹具为本项目直接创作的 XML。原创乐谱、对应 PDF／MIDI／映射与截图沿用 MIT，未使用个人或未授权曲目。
+v1.1 历史 MIDI 演示及测试夹具由原 generate_demos.py／generate_fixtures.py 生成，源码在基线 757443f 可查，原创编排采用 MIT；相关 MIDI 产品入口和 hands sidecar 已退役。v2 的“初光”和“回环与晨光”由 [generate_v2_fixtures.py](tools/generate_v2_fixtures.py) 直接编写 MusicXML；指法与连奏符号夹具，以及“连奏与再起音 · 下落练习”（tests/fixtures/v2/roll-articulation.musicxml），均为本项目直接创作的 XML。原创乐谱、对应 PDF／MIDI／映射与截图沿用 MIT，未使用个人或未授权曲目。
 
 `docs/screenshots/` 中选定的正式截图来自真实 AppCore CPU View，使用本项目原创曲与随包音源生成的实际概览；未使用生成式图片。其他验证截图保存在本地 `.tmp/pianoscope/validation/screenshots/`；AI 设计参考位于 `.tmp/pianoscope/reference/design/`，不作为运行截图或产品资源提交。
 
