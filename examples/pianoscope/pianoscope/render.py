@@ -1,6 +1,7 @@
 """Offline event-time rendering. A job exclusively owns its synthesizer."""
 import numpy as np
 from .synth import Synth
+from .pcm_budget import require_pcm_budget
 
 def audible_notes(score, config):
     tracks={t['id']:t for t in config['tracks']};solo=any(t['solo'] for t in tracks.values())
@@ -12,7 +13,7 @@ def audible_notes(score, config):
 
 def render(score, config, sample_rate, cancelled=lambda:False, progress=lambda _:None):
     rate=config['rate'];count=round((score.duration_s/rate+2)*sample_rate)
-    if count*8>192*1024*1024:raise ValueError('声音缓冲超过 192 MiB 限制')
+    require_pcm_budget(count*8)
     notes=audible_notes(score,config)
     # Assign overlap lanes per track/pitch; different pitches share a channel safely.
     slots={};routes={};events=[];channels={};source_by_track={t['id']:t['source_channel'] for t in score.tracks}

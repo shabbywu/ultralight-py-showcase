@@ -20,7 +20,8 @@ from .playback_plan import compile_plan
 from .midi_compile import compile_midi, sound_score
 from .score_mapping import json_value
 from .score_process import run_preparation
-from .render import render
+from .render import render, audible_notes
+from .pcm_budget import require_pcm_budget
 from .analysis import overview, analyze
 from .dialogs import choose_path, choose_score_path
 
@@ -134,8 +135,7 @@ class Controller(ScorePlayer):
                 config = dict(rate=1.,hand_mode='both',tracks=[dict(id=p['id'],muted=False,solo=False) for p in document.parts])
                 count = round((plan.duration_s+2)*self.audio.sample_rate)*8
                 current_bytes = self.audio.pcm.nbytes if self.audio.pcm is not None else 0
-                if count + current_bytes > 192*1024**2:
-                    raise ValueError('当前与候选声音缓冲合计超过 192 MiB')
+                require_pcm_budget(count,current_bytes)
                 rendered_sample_rate=self.audio.sample_rate
                 pcm = render(sound_score(plan),config,rendered_sample_rate,check)
                 if check():
@@ -422,6 +422,16 @@ class Controller(ScorePlayer):
         return dict(result,generation=self.generation,layout_revision=self.active['data']['manifest']['layout_revision'] if self.active else None,
                     hand_mode=self.config['hand_mode'] if self.config else 'both',hand_status='confirmed' if self.hands else 'unassigned')
 
+    def _same_audio(self, next_score, next_config):
+        # Labels and equivalent scope selections need no second PCM. The
+        # synthesizer consumes these event fields, not hand/source labels.
+        if self.audio.pcm is None or self.active['sample_rate']!=self.audio.sample_rate or self.config['rate']!=next_config['rate']:
+            return False
+        def events(score,config):
+            return [(n.id,n.track_id,n.pitch,n.velocity,n.start_s,n.key_off_s,n.sustain_end_s)
+                    for n in audible_notes(score,config)]
+        return events(self.score,self.config)==events(next_score,next_config)
+
     async def configure(self, changes):
         if self.plan is None:
             raise ValueError('请先打开乐谱')
@@ -449,10 +459,14 @@ class Controller(ScorePlayer):
         plan=self.plan
         def cancelled():
             return self.closed or self.plan is not plan or generation!=self.configuration_generation
+        if self._same_audio(self.score,config):
+            async with self.command_lock:
+                if cancelled():raise ValueError('试听已过期')
+                self.config=config
+                return self.get_transport()
         def work():
             count=round((plan.duration_s/config['rate']+2)*self.audio.sample_rate)*8
-            if count+self.audio.pcm.nbytes>192*1024**2:
-                raise ValueError('当前与候选声音缓冲合计超过 192 MiB')
+            require_pcm_budget(count,self.audio.pcm.nbytes)
             return render(self.score,config,self.audio.sample_rate,cancelled)
         async with self._audio_candidate(cancelled):
             pcm=None
@@ -540,10 +554,15 @@ class Controller(ScorePlayer):
         config=copy.deepcopy(self.config)
         if not assignments:
             config['hand_mode']='both'
+        if self._same_audio(next_score,config):
+            async with self.command_lock:
+                if cancelled():raise ValueError('手别预览已过期')
+                self.plan,self.score,self.hands,self.config=next_plan,next_score,dict(assignments),config
+                self.active['plan']=next_plan
+                return
         def work():
             count=round((next_plan.duration_s/config['rate']+2)*self.audio.sample_rate)*8
-            if count+self.audio.pcm.nbytes>192*1024**2:
-                raise ValueError('当前与候选声音缓冲合计超过 192 MiB')
+            require_pcm_budget(count,self.audio.pcm.nbytes)
             return render(next_score,config,self.audio.sample_rate,cancelled)
         async with self._audio_candidate(cancelled):
             pcm=None
@@ -662,9 +681,11 @@ class Controller(ScorePlayer):
                 self.phase='paused' if plan else 'empty'
                 if self.audio.ready and plan and self.audio.sample_rate!=before:
                     count=round((plan.duration_s/self.config['rate']+2)*self.audio.sample_rate)*8
-                    if count+self.audio.pcm.nbytes>192*1024**2:
+                    try:
+                        require_pcm_budget(count,self.audio.pcm.nbytes)
+                    except ValueError as exc:
                         self.audio.ready=False
-                        self.audio.error='新采样率与旧缓冲合计超预算，请重启后重新打开乐谱'
+                        self.audio.error=str(exc)
                     else:
                         try:
                             pcm=await asyncio.to_thread(render,self.score,self.config,self.audio.sample_rate,cancelled)

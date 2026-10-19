@@ -2,6 +2,7 @@
 import asyncio
 from functools import wraps
 from .audio import Audio
+from .pcm_budget import require_pcm_budget
 from .render import render, audible_notes
 from .midi_compile import sound_score
 from .score_mapping import json_value
@@ -119,8 +120,7 @@ class ScorePlayer:
             raise ValueError('支持 0.5×／0.75×／1×')
         # Prepare before touching the currently audible version.
         count = round((self.plan.duration_s / config['rate'] + 2) * self.audio.sample_rate)
-        if count * 8 + self.audio.pcm.nbytes > 192 * 1024**2:
-            raise ValueError('当前与候选声音缓冲合计超过 192 MiB')
+        require_pcm_budget(count*8,self.audio.pcm.nbytes)
         pcm = await asyncio.to_thread(render, self.score, config, self.audio.sample_rate)
         was_playing = self.audio.playing
         position = await self.audio.fade_halt()
