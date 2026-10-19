@@ -11,11 +11,11 @@ UNITS = {'whole': Q(4), 'half': Q(2), 'quarter': Q(1), 'eighth': Q(1, 2),
 METERS = {(2, 4), (3, 4), (4, 4), (3, 8), (6, 8), (9, 8), (12, 8)}
 DYNAMICS = dict(zip(('ppp', 'pp', 'p', 'mp', 'mf', 'f', 'ff', 'fff'), (24, 36, 48, 60, 76, 92, 108, 120)))
 UNSUPPORTED = {'grace', 'unpitched', 'transpose', 'trill-mark', 'turn', 'inverted-turn',
-               'mordent', 'inverted-mordent', 'tremolo', 'arpeggiate', 'swing', 'segno', 'coda',
+               'mordent', 'inverted-mordent', 'swing', 'segno', 'coda',
                'senza-misura', 'multiple-rest', 'measure-repeat', 'slash', 'scordatura'}
 UNSUPPORTED.update({'delayed-turn','delayed-inverted-turn','vertical-turn','inverted-vertical-turn',
                     'schleifer','shake','haydn','other-ornament','glissando','slide','bend',
-                    'hammer-on','pull-off','breath-mark','caesura','play','listen','listening'})
+                    'hammer-on','pull-off','caesura','play','listen','listening'})
 
 
 @dataclass(frozen=True)
@@ -36,6 +36,8 @@ class ScoreElement:
     cue: bool = False
     visible: bool = True
     velocity_override: int | None = None
+    arpeggio: tuple | None = None
+    tremolo: tuple | None = None
 
 
 @dataclass
@@ -95,7 +97,7 @@ def parse_score(source, settings=None, cancelled=lambda: False):
             error(n, '首版不能执行此记号：' + n.tag)
         if n.tag == 'sound' and any(k in n.attrib for k in ('dacapo', 'dalsegno', 'fine', 'tocoda', 'coda', 'segno', 'time-only', 'sostenuto-pedal', 'soft-pedal')):
             error(n, '首版不执行导航／条件播放或特殊踏板')
-        if n.tag in ('fermata', 'wedge', 'accent', 'tenuto') or n.tag == 'words' and any(w in (n.text or '').lower() for w in ('rit', 'accel')):
+        if n.tag in ('fermata', 'wedge', 'accent', 'tenuto', 'breath-mark') or n.tag == 'words' and any(w in (n.text or '').lower() for w in ('rit', 'accel')):
             diagnostics.append(dict(code='DISPLAY_ONLY', message='仅显示，未额外改变声音：' + n.tag,
                                     source_locator=source.locations[n.get('id')]['source_locator']))
     part_nodes = root.findall('part')
@@ -199,11 +201,29 @@ def parse_score(source, settings=None, cancelled=lambda: False):
                     elif item.find('rest') is None:
                         error(item, '音符缺少 pitch／rest')
                     tm = item.find('time-modification')
-                    if tm is not None and (int(tm.findtext('actual-notes', '0')), int(tm.findtext('normal-notes', '0'))) not in ((3, 2), (5, 4), (6, 4), (7, 4)):
+                    arpeggio = item.find('notations/arpeggiate')
+                    tremolo = item.find('notations/ornaments/tremolo')
+                    arp = trem = None
+                    if arpeggio is not None:
+                        direction = arpeggio.get('direction')
+                        if direction not in (None, 'up', 'down') or pitch is None:
+                            error(arpeggio, '琶音需要明确音高及 up／down 方向')
+                        arp = (arpeggio.get('number', '1'), direction)
+                    if tremolo is not None:
+                        kind = tremolo.get('type', 'single')
+                        marks = (tremolo.text or '').strip()
+                        unit = UNITS.get(item.findtext('type'))
+                        if kind not in ('single', 'start', 'stop') or not re.fullmatch('[1-8]',marks) or not unit or pitch is None:
+                            error(tremolo, '仅支持 1–8 划的定量单音／成对震音；自由震音尚未支持')
+                        trem = (kind, int(marks), min(Q(1), unit) / 2**int(marks))
+                    ratios = ((3, 2), (5, 4), (6, 4), (7, 4)) + (((2, 1),) if is_chord or trem and trem[0] in ('start', 'stop') else ())
+                    if tm is not None and (int(tm.findtext('actual-notes', '0')), int(tm.findtext('normal-notes', '0'))) not in ratios:
                         error(item, '连音比率未经验证')
                     if len(item.findall("notations/tuplet[@type='start']")) > 1:
                         error(item, '不支持嵌套连音')
                     ties = {t.get('type') for t in item.findall('tie')}
+                    if ((arp or trem) and (ties or item.find('cue') is not None or item.find('notations/articulations/staccato') is not None)) or (arp and trem):
+                        error(item, '琶音／震音与 tie、cue 或 staccato 的组合尚未验证')
                     tied = item.findall('notations/tied')
                     numbers = {t.get('number', '1') for t in tied}
                     if len(numbers) > 1:
@@ -220,7 +240,7 @@ def parse_score(source, settings=None, cancelled=lambda: False):
                     elements.append(ScoreElement(item.get('id'), uid, pid, f'{pid}:{staff}', voice,
                         onset, duration, pitch, spelling, 'start' in ties, 'stop' in ties,
                         next(iter(numbers), '1'), item.find('notations/articulations/staccato') is not None,
-                        item.find('cue') is not None, item.get('print-object') != 'no',velocity_override))
+                        item.find('cue') is not None, item.get('print-object') != 'no',velocity_override,arp,trem))
                     if item.find('cue') is not None or item.get('print-object')=='no':
                         diagnostics.append(dict(code='CUE_DISPLAY_ONLY' if item.find('cue') is not None else 'INVISIBLE_PLAYBACK',
                             message='cue 音符仅展示，不生成起音' if item.find('cue') is not None else '不可见音符保留播放，按源设置不显示',
@@ -265,6 +285,10 @@ def parse_score(source, settings=None, cancelled=lambda: False):
                         for met in dt.findall('metronome'):
                             unit = UNITS.get(met.findtext('beat-unit'))
                             per = met.findtext('per-minute')
+                            if unit and not per and sound is not None and sound.get('tempo') is not None:
+                                diagnostics.append(dict(code='METRONOME_SOUND_TEMPO', message='节拍器缺少数值，播放采用同一 direction 的 sound tempo，原记号保留',
+                                    source_locator=source.locations[met.get('_ps_id')]['source_locator']))
+                                continue
                             if not unit or not per:
                                 error(met, 'metronome 不能换算为明确速度')
                             dots = len(met.findall('beat-unit-dot'))
@@ -280,6 +304,10 @@ def parse_score(source, settings=None, cancelled=lambda: False):
                             names = [v.tag for v in dynamics]
                             if names:
                                 if len(names) != 1 or names[0] not in DYNAMICS:
+                                    if sound is not None and sound.get('dynamics') is not None:
+                                        diagnostics.append(dict(code='DYNAMICS_SOUND_VALUE', message='组合力度记号保留显示，播放采用同一 direction 的 sound dynamics',
+                                            source_locator=source.locations[dynamics.get('_ps_id')]['source_locator']))
+                                        continue
                                     error(dynamics, '力度符号不能按首版策略执行')
                                 directions.append(dict(onset=pos, kind='velocity', value=Q(DYNAMICS[names[0]]),
                                                        priority=1, scope=scope, element_id=item.get('id')))
@@ -352,4 +380,4 @@ def parse_score(source, settings=None, cancelled=lambda: False):
     if settings.get('default_tempo') and not 10 <= Q(str(settings['default_tempo'])) <= 1000:
         error(root, '确认速度必须在 10–1000 BPM 内')
     return ScoreDocument(source, root.findtext('work/work-title') or root.findtext('movement-title') or source.original_name,
-                         parts, combined, diagnostics, needs, hashlib.sha256((source.sha256 + ':profile1').encode()).hexdigest()[:24])
+                         parts, combined, diagnostics, needs, hashlib.sha256((source.sha256 + ':profile2').encode()).hexdigest()[:24])

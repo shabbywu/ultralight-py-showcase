@@ -184,6 +184,25 @@ def engrave(xml, title, directory, cancelled=lambda:False, caption=None, layout_
     count = toolkit.getPageCount()
     if not 1 <= count <= 32:
         raise NotationError('谱面超过 32 页限制')
+    reflowed=False
+    if layout_options and layout_options.get('breaks')=='encoded':
+        # Encoded page breaks may describe a different paper/staff size. Check
+        # actual native geometry before rasterizing; reflow the derived score
+        # once rather than clipping any source music to our fixed A4 output.
+        overflow=False
+        for page in range(1,count+1):
+            if cancelled():raise InterruptedError('已取消')
+            data=geometry(toolkit.renderToSVG(page),hidden_ids)
+            for system in data['systems']:
+                x,y,w,h=system['bbox']
+                overflow |= x<0 or y<45 or x+w>data['width'] or y+h>data['height']-30
+        if overflow:
+            toolkit.setOptions({'breaks':'auto'})
+            toolkit.resetXmlIdSeed(1)
+            if not toolkit.loadData(xml):raise ValueError('A4 重新分页失败：'+toolkit.getLog())
+            count=toolkit.getPageCount()
+            if not 1<=count<=32:raise NotationError('谱面超过 32 页限制')
+            reflowed=True
     pages=[]
     decoded_bytes=0;image_scale=2
     for page in range(1,count+1):
@@ -219,4 +238,5 @@ def engrave(xml, title, directory, cancelled=lambda:False, caption=None, layout_
     writer.add_metadata({'/Title':title,'/Creator':'PianoScope / Verovio 5.6.0'})
     writer.write(str(directory/'score.pdf'));writer.close()
     (directory/'score.musicxml').write_text(xml,encoding='utf-8')
-    return dict(pages=pages,engine=toolkit.getVersion())
+    return dict(pages=pages,engine=toolkit.getVersion(),layout_policy='a4-reflow' if reflowed else 'encoded',
+                layout_diagnostics=[dict(code='A4_REFLOW',message='源分页超出 A4 可打印区域，派生谱面已重新分页；原文件完整保留')] if reflowed else [])

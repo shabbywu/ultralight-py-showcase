@@ -72,7 +72,10 @@ class PlaybackPlan:
             current = self.occurrence_at(seconds)['id']
             target = next((s for s in candidates if s['occurrence_id'] == current), None)
             target = target or next((s for s in candidates if s['start_s'] >= seconds), candidates[0])
-        return dict(target, choices=[dict(occurrence_id=s['occurrence_id'], position_s=s['start_s']) for s in candidates])
+        choices={}
+        for span in candidates:
+            choices.setdefault(span['occurrence_id'],dict(occurrence_id=span['occurrence_id'],position_s=span['start_s']))
+        return dict(target, choices=list(choices.values()))
 
 
 def expand_path(measures):
@@ -124,12 +127,86 @@ def expand_path(measures):
     return path
 
 
+def performed_notes(measure, source, diagnostics):
+    """Source-declared ornaments only; exact bounded events, no quantization."""
+    def error(e, text):
+        fail(text, source.locations[e.id]['source_locator'])
+    arps = defaultdict(list)
+    for e in measure.elements:
+        if e.arpeggio:
+            arps[(e.part_id, e.onset, e.arpeggio[0])].append(e)
+    offsets = {}
+    for group in arps.values():
+        directions = {e.arpeggio[1] for e in group if e.arpeggio[1]}
+        if len(directions) > 1:
+            error(group[0], '同组琶音方向矛盾')
+        group = sorted(group, key=lambda e: (e.pitch, e.id), reverse='down' in directions)
+        # MusicXML declares order, not spread time. This documented playback
+        # policy uses 1/16 quarter-note steps, capped to half the shortest note.
+        step = min(Q(1, 16), min(e.duration for e in group) / (2 * len(group)))
+        for i, e in enumerate(group):
+            offsets[e.id] = i * step
+        diagnostics.append(dict(code='ARPEGGIO_POLICY', message='琶音按源方向依次起音；间隔为 1/16 四分音符，短音时收窄，结束位置不延长', element_id=group[0].id,
+                                source_locator=source.locations[group[0].id]['source_locator']))
+    voices = defaultdict(list)
+    for e in measure.elements:
+        voices[(e.part_id, e.voice_id)].append(e)
+    strokes, consumed = {}, set()
+    for elements in voices.values():
+        clusters = defaultdict(list)
+        for e in elements:
+            clusters[e.onset].append(e)
+        groups = [clusters[q] for q in sorted(clusters)]
+        def signature(group):
+            marks = {e.tremolo for e in group if e.tremolo}
+            if len(marks) > 1:
+                error(group[0], '同一和弦震音记号矛盾')
+            return next(iter(marks), None)
+        for i, group in enumerate(groups):
+            e = group[0]
+            spec = signature(group)
+            if not spec or e.id in consumed:
+                continue
+            kind, marks, step = spec
+            endpoints = [group]
+            if kind == 'start' and i + 1 < len(groups):
+                other = groups[i + 1]
+                if signature(other) != ('stop', marks, step) or other[0].onset != e.onset + e.duration:
+                    error(e, '成对震音需同小节同声部相邻且划数一致')
+                endpoints.append(other)
+            elif kind != 'single':
+                error(e, '震音 start／stop 缺少同小节配对')
+            members = [n for endpoint in endpoints for n in endpoint]
+            if any(n.pitch is None or n.duration != e.duration or n.tie_start or n.tie_stop or n.arpeggio or n.cue or n.staccato for n in members):
+                error(e, '震音需等时值的明确音高；与 tie／琶音／cue／staccato 的组合尚未验证')
+            length = e.duration * len(endpoints)
+            if length % step:
+                error(e, '震音时长不是明确击奏间隔的整数倍')
+            count = int(length / step)
+            if count * max(map(len, endpoints)) > 20_000:
+                error(e, '震音展开超过 20,000')
+            consumed.update(n.id for n in members if n.id != e.id)
+            strokes[e.id] = [(n, e.onset + j * step, e.onset + (j + 1) * step)
+                             for j in range(count) for n in endpoints[j % len(endpoints)]]
+    result = []
+    for e in measure.elements:
+        if e.id in consumed:
+            continue
+        if e.id in strokes:
+            result.extend(strokes[e.id])
+        else:
+            result.append((e, e.onset + offsets.get(e.id, 0), e.onset + e.duration))
+        if len(result) > 20_000:
+            error(e, '展开音符超过 20,000')
+    return sorted(result, key=lambda item: item[1])
+
+
 def compile_plan(document, settings=None, cancelled=lambda: False):
     settings = dict(settings or {})
     if document.needs_confirmation:
         fail('播放参数需要确认：' + '；'.join(document.needs_confirmation.values()), code='SCORE_CONFIRMATION')
     signature = json.dumps(settings, sort_keys=True, ensure_ascii=False)
-    revision = hashlib.sha256((document.revision + ':playback-v1:' + signature).encode()).hexdigest()[:24]
+    revision = hashlib.sha256((document.revision + ':playback-v2:' + signature).encode()).hexdigest()[:24]
     plan = PlaybackPlan(document, [], [], [], [], [], Q(0), revision, settings)
     plan.diagnostics=list(document.diagnostics)
     # State at each written measure boundary. A jump restores that boundary state;
@@ -150,6 +227,10 @@ def compile_plan(document, settings=None, cancelled=lambda: False):
             priority = max(d['priority'] for d in group)
             group = [d for d in group if d['priority'] == priority]
             values = {d['value'] for d in group}
+            if len(values) > 1 and kind == 'tempo' and len({d['scope'] for d in group}) == 1:
+                location = document.source.locations.get(group[-1]['element_id'], {}).get('source_locator', '')
+                plan.diagnostics.append(dict(code='TEMPO_SOURCE_ORDER', message='同谱表同位置有多个速度命令，按源顺序采用最后一个：'+str(group[-1]['value'])+' BPM', source_locator=location))
+                group, values = group[-1:], {group[-1]['value']}
             # A pedal change deliberately has two events in source order.
             if len(values) > 1 and not (kind == 'damper-pedal' and len({d['element_id'] for d in group}) == 1):
                 fail('同位置同优先级播放参数冲突',document.source.locations.get(group[0]['element_id'],{}).get('source_locator',''))
@@ -197,10 +278,10 @@ def compile_plan(document, settings=None, cancelled=lambda: False):
                                           value=round(d['value'] * Q(127, 100))))
         # Tie matching follows exact adjacency in the actual expanded path. Staff
         # is intentionally absent from the key, so a voice can cross staves.
-        for e in sorted(measure.elements, key=lambda e: e.onset):
+        for e, performed_on, performed_off in performed_notes(measure, document.source, plan.diagnostics):
             if e.pitch is None or e.cue:
                 continue
-            on, off = base + e.onset, base + e.onset + e.duration
+            on, off = base + performed_on, base + performed_off
             key = (e.part_id, e.voice_id, e.pitch, e.tie_number)
             candidates = pending.get(key, [])
             match = [n for n in candidates if n['key_off_qn'] == on] if e.tie_stop else []
@@ -217,7 +298,7 @@ def compile_plan(document, settings=None, cancelled=lambda: False):
                     plan.diagnostics.append(dict(code='TIE_PATH_REARTICULATION', message='实际路径没有相邻 tie 起点，此段重新起音', element_id=e.id))
                 velocity = velocities[e.part_id]
                 for d in local:
-                    if d['kind'] == 'velocity' and d['scope'] == e.part_id and d['onset'] <= e.onset:
+                    if d['kind'] == 'velocity' and d['scope'] == e.part_id and d['onset'] <= performed_on:
                         velocity = int(d['value'])
                 if e.velocity_override is not None:
                     velocity=e.velocity_override
@@ -234,7 +315,7 @@ def compile_plan(document, settings=None, cancelled=lambda: False):
                 pending.setdefault(key, []).append(note)
             plan.display_spans.append(dict(instance_id=note['id'], element_id=e.id,
                                            occurrence_id=occ_id, start_qn=on,
-                                           end_qn=min(base + e.onset + e.duration, note['key_off_qn'])))
+                                           end_qn=min(base + performed_off, note['key_off_qn'])))
         # Preserve final control state on contiguous written measures.
         for d in local:
             if d['kind'] == 'tempo':
