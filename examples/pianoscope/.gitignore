@@ -1,0 +1,20 @@
+.venv/
+__pycache__/
+.pytest_cache/
+*.egg-info/
+build/
+dist/
+
+# Local MIDI inputs and validation output belong in ../../.tmp/pianoscope/.
+/*.[mM][iI][dD]
+/*.[mM][iI][dD][iI]
+/docs/reports/
+/docs/screenshots/*
+!/docs/screenshots/v11-score-800.png
+/docs/samples/*
+!/docs/samples/v11/
+/docs/samples/v11/*
+!/docs/samples/v11/first-light.pdf
+!/docs/samples/v11/first-light.musicxml
+!/docs/samples/v11/edge-phrase.pdf
+!/docs/samples/v11/edge-phrase.musicxml
