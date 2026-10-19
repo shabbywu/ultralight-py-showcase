@@ -14,6 +14,9 @@ from pianoscope.v2_bridge import register
 from pianoscope.dialogs import before_window_close
 
 ROOT=Path(__file__).resolve().parent
+# Poll AppCore frequently enough to service native display/input callbacks.
+# This is a host wake interval; the audio device remains the transport clock.
+APP_UPDATE_INTERVAL=1/240
 
 
 def main():
@@ -54,7 +57,7 @@ def main():
             window.view.load_url('file:///index.html')
             if args.smoke:
                 async def smoke():
-                    pump=asyncio.create_task(app.run_async(update_interval=1/120))
+                    pump=asyncio.create_task(app.run_async(update_interval=APP_UPDATE_INTERVAL))
                     try:
                         from pianoscope.v2_checks import verify
                         await verify(window.view,controller,args,report)
@@ -69,7 +72,7 @@ def main():
                 asyncio.run(smoke())
             else:
                 try:
-                    app.run()
+                    asyncio.run(app.run_async(update_interval=APP_UPDATE_INTERVAL))
                 finally:
                     controller.close()
         report['status']='passed'

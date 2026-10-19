@@ -15,7 +15,7 @@
   </div><div class="sidebar-foot">A0 — C8 <span>88 键</span></div>
 </aside>
 <main>
-  <div class="top"><button id="menu" aria-label="打开侧栏">☰</button><div class="song"><b id="title">PianoScope</b><small id="meta">看见音乐，认识琴键</small></div><div class="keytools"><div id="keyboardMode" class="segmented" role="radiogroup" aria-label="键盘范围" data-value="focused"><button id="full" type="button" role="radio" value="full">完整键盘</button><button id="focused" type="button" role="radio" value="focused">曲目键盘</button></div><label><input id="names" type="checkbox" checked>显示音名</label><label class="lift-control">触键线上移 <input id="lift" type="range" min="0" max="60" value="0"><span id="liftText">0%</span></label></div></div>
+  <div class="top"><button id="menu" aria-label="打开侧栏">☰</button><div class="song"><b id="title">PianoScope</b><small id="meta">看见音乐，认识琴键</small></div><div class="keytools"><div id="keyboardMode" class="segmented" role="radiogroup" aria-label="键盘范围" data-value="focused"><button id="full" type="button" role="radio" value="full">完整键盘</button><button id="focused" type="button" role="radio" value="focused">曲目键盘</button></div><label><input id="names" type="checkbox" checked>显示音名</label><button id="rollEffects" class="roll-effects" type="button" aria-pressed="true">触键光效</button><label class="lift-control">触键线上移 <input id="lift" type="range" min="0" max="60" value="0"><span id="liftText">0%</span></label></div></div>
   <div class="tools"><div class="segmented views" role="radiogroup" aria-label="乐谱视图" data-value="sheet"><button id="sheetMode" type="button" role="radio" value="sheet">五线谱</button><button id="rollMode" type="button" role="radio" value="roll">下落音符</button></div><div class="score-tools"><button id="follow" aria-pressed="true">自动跟随</button><button id="current">回到当前</button><div id="zoom" class="segmented" role="radiogroup" aria-label="谱面缩放" data-value="1"><button type="button" role="radio" value="1">100%</button><button type="button" role="radio" value="1.25">125%</button><button type="button" role="radio" value="1.5">150%</button></div><button id="keyboardToggle">显示键盘</button></div><span id="visitText" class="muted"></span><div id="occurrence" class="segmented" role="radiogroup" aria-label="跳转遍次" hidden></div></div>
   <div id="message" role="status" hidden></div><div id="loading" hidden><span id="loadLabel"></span><button id="cancelLoad">取消</button></div>
   <div class="music-scene">
@@ -33,5 +33,5 @@
   <div id="deviceError" hidden><span>声音设备不可用，请连接耳机或扬声器。</span><button id="retry">重试</button></div>
 </main>
 <div id="modal" hidden><section role="dialog" aria-modal="true" aria-labelledby="modalTitle"><div class="modalhead"><b id="modalTitle"></b><button id="closeModal" aria-label="关闭窗口">×</button></div><div id="modalBody"></div><div id="modalActions"></div></section></div>
-<script src="config.js"></script><script src="keyboard.js"></script><script src="v2.js"></script>
+<script src="config.js"></script><script src="keyboard.js"></script><script src="roll.js"></script><script src="v2.js"></script>
 </body></html>

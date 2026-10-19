@@ -151,3 +151,9 @@ main { flex: 1; min-width: 0; min-height: 0; padding: 12px 16px; display: flex; 
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
 
 @media (max-width:1100px) { .roll-view .keytools .lift-control { display:flex; } }
+
+.keytools .roll-effects { display:none; min-height:28px; padding:4px 8px; font-size:11px; }
+.roll-view .keytools .roll-effects { display:block; }
+#strike.flow::before { content:""; position:absolute; left:0; right:0; top:-2px; height:6px; background:#efbd70; animation:strike-flow .85s ease-in-out infinite alternate; }
+@keyframes strike-flow { from { opacity:.15; } to { opacity:.4; } }
+@media (prefers-reduced-motion:reduce) { #strike.flow::before { animation:none; opacity:.2; } }
