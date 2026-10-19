@@ -33,5 +33,23 @@
     "image": "assets/bridge-lab.png",
     "image_alt": "Bridge Lab 原生截图：六个案例均支持 Python 与 JavaScript 双端编辑，控制台展示真实桥接结果",
     "guide": "https://github.com/shabbywu/ultralight-py-showcase/tree/main/examples/bridge-lab#readme"
+  },
+  {
+    "id": "pianoscope",
+    "title": "PianoScope",
+    "status": "可运行 · 部分人工验收待完成",
+    "kind": "钢琴播放器与练习谱 / AppCore",
+    "description": "看见音乐，认识琴键。真实钢琴音源播放 MIDI，支持文件夹曲库、左右手设置、慢放循环和声音分析。可生成双谱表练习谱，预览后应用，跟随原曲高亮并导出 PDF／MusicXML。",
+    "features": [
+      "真实 SoundFont 钢琴",
+      "双谱表量化 / 自动调号与谱号",
+      "原曲时钟跟谱 / 慢放循环",
+      "可打印 PDF / 可编辑 MusicXML"
+    ],
+    "source": "https://github.com/shabbywu/ultralight-py-showcase/tree/main/examples/pianoscope",
+    "source_label": "查看源码",
+    "image": "assets/pianoscope.png",
+    "image_alt": "PianoScope 原生 AppCore 截图：实际钢琴音源播放初光，左手薄荷绿、右手暖金，键盘下方显示真实声音波形与频谱",
+    "guide": "https://github.com/shabbywu/ultralight-py-showcase/tree/main/examples/pianoscope#readme"
   }
 ]
