@@ -411,6 +411,30 @@ class Controller(ScorePlayer):
     def get_source_elements(self):
         return [dict(element_id=e.id,staff_id=e.staff_id,voice_id=e.part_id+':'+e.voice_id) for e in self.plan.document.elements if e.pitch is not None] if self.plan else []
 
+    def get_practice_settings(self):
+        """Return the applied settings, including empty scopes and mixed labels."""
+        if not self.plan:
+            raise ValueError('请先打开乐谱')
+        document=self.get_document()
+        elements=[e for e in self.plan.document.elements if e.pitch is not None]
+        staves=[]
+        for index,ident in enumerate(document['staff_ids']):
+            labels={self.hands.get(e.id,'unassigned') for e in elements if e.staff_id==ident}
+            paired=len(document['staff_ids'])==2 or len(document['parts'])==1 and document['parts'][0]['staves']==2
+            name=('上谱表' if index==0 else '下谱表') if paired else '谱表 '+str(index+1)
+            staves.append(dict(id=ident,name=name,notes=sum(e.staff_id==ident for e in elements),
+                               hand=next(iter(labels)) if len(labels)==1 else 'mixed' if labels else 'unassigned',
+                               suggestion='right' if index==0 else 'left'))
+        voices=[]
+        for ident in document['voices']:
+            sources={e.staff_id for e in elements if e.part_id+':'+e.voice_id==ident}
+            staff_name=next((s['name'] for s in staves if s['id'] in sources),'') if len(sources)==1 else '跨谱表'
+            voices.append(dict(id=ident,name=staff_name+' · 声部 '+ident.rsplit(':',1)[-1]))
+        return dict(source_revision=self.plan.document.revision,staves=staves,voices=voices,
+                    staff_ids=list(self.config.get('staff_ids')) if self.config.get('staff_ids') is not None else document['staff_ids'],
+                    voice_ids=list(self.config.get('voice_ids')) if self.config.get('voice_ids') is not None else document['voices'],
+                    hand_mode=self.config['hand_mode'],hand_status=document['hand_status'],can_undo=bool(self.hand_history))
+
     async def apply_hands(self, preview_id):
         preview=self.hand_preview
         if not preview or preview['id']!=preview_id or preview['source_revision']!=self.plan.document.revision:
@@ -436,6 +460,8 @@ class Controller(ScorePlayer):
         def cancelled():
             return self.closed or self.plan is not old_plan or generation!=self.configuration_generation
         config=copy.deepcopy(self.config)
+        if not assignments:
+            config['hand_mode']='both'
         def work():
             count=round((next_plan.duration_s/config['rate']+2)*self.audio.sample_rate)*8
             if count+self.audio.pcm.nbytes>192*1024**2:
@@ -452,7 +478,7 @@ class Controller(ScorePlayer):
                     if cancelled():
                         raise ValueError('手别预览已过期')
                     self.audio.install(pcm,config['rate'],next_plan.duration_s,position)
-                    self.plan,self.score,self.hands=next_plan,next_score,dict(assignments)
+                    self.plan,self.score,self.hands,self.config=next_plan,next_score,dict(assignments),config
                     self.active['plan']=next_plan
                     self.active['sample_rate']=self.audio.sample_rate
                     if self.phase=='playing':

@@ -238,3 +238,44 @@ def test_actual_workers_are_deterministic_and_reject_thirty_three_pages(tmp_path
     folder=tmp_path/'overflow';folder.mkdir();(folder/'request.json').write_text(json.dumps(dict(source_path=str(path))))
     with pytest.raises(ScoreInputError,match='32 页'):run_preparation(folder)
     assert not (folder/'score.pdf').exists()
+
+
+def test_practice_settings_reopen_preserves_scope_labels_and_undo_mode(controller):
+    c=controller;load(c,FIXTURES/'temporal.musicxml')
+    original=(c.plan.document.source.sha256,c.get_document()['layout_revision'],c.plan.midi_bytes)
+    state=c.get_practice_settings()
+    assert [s['name'] for s in state['staves']]==['上谱表','下谱表']
+    assert state['staff_ids']==['P1:1','P1:2'] and not state['can_undo']
+    asyncio.run(c.configure({'staff_ids':[],'voice_ids':['P1:2']}))
+    state=c.get_practice_settings()
+    assert state['staff_ids']==[] and state['voice_ids']==['P1:2']
+    asyncio.run(c.configure({'staff_ids':['P1:2']}))
+    labels={e.id:'left' if e.staff_id=='P1:2' else 'right' for e in c.plan.document.elements if e.pitch is not None}
+    preview=c.preview_hands(labels)
+    assert c.get_practice_settings()['hand_status']=='unassigned'
+    asyncio.run(c.apply_hands(preview['preview_id']))
+    state=c.get_practice_settings()
+    assert [s['hand'] for s in state['staves']]==['right','left'] and state['can_undo']
+    asyncio.run(c.configure({'hand_mode':'left'}))
+    assert c.get_transport()['hand_mode']=='left'
+    asyncio.run(c.undo_hands())
+    state=c.get_practice_settings()
+    assert state['hand_status']=='unassigned' and state['hand_mode']=='both' and not state['can_undo']
+    assert state['staff_ids']==['P1:2'] and state['voice_ids']==['P1:2']
+    assert (c.plan.document.source.sha256,c.get_document()['layout_revision'],c.plan.midi_bytes)==original
+
+
+def test_practice_state_preserves_mixed_per_note_labels(controller):
+    c=controller;load(c,FIXTURES/'temporal.musicxml')
+    upper=[e for e in c.plan.document.elements if e.pitch is not None and e.staff_id=='P1:1']
+    assignments={upper[0].id:'left',upper[1].id:'right'}
+    p=c.preview_hands(assignments);asyncio.run(c.apply_hands(p['preview_id']))
+    state=c.get_practice_settings()
+    assert state['staves'][0]['hand']=='mixed'
+    pcm=c.audio.pcm
+    lower={e.id:'left' for e in c.plan.document.elements if e.pitch is not None and e.staff_id=='P1:2'}
+    p=c.preview_hands(lower)
+    assert c.audio.pcm is pcm and c.hands==assignments
+    asyncio.run(c.apply_hands(p['preview_id']))
+    assert all(c.hands[k]==v for k,v in assignments.items())
+    assert c.get_practice_settings()['staves'][0]['hand']=='mixed'

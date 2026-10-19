@@ -151,6 +151,7 @@ class ScorePlayer:
         return dict(seq=self.seq, clock_epoch=self.audio.epoch, phase=self.phase,
                     position_s=seconds, duration_s=plan.duration_s if plan else 0.,
                     rate=self.config['rate'] if self.config else 1., volume=self.audio.volume,
+                    hand_mode=self.config['hand_mode'] if self.config else 'both',
                     loop=self.audio.loop, source_revision=plan.document.revision if plan else None,
                     playback_revision=plan.revision if plan else None,
                     occurrence_id=occurrence['id'] if occurrence else None,
