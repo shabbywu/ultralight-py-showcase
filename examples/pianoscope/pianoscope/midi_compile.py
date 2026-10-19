@@ -33,11 +33,26 @@ def compile_midi(plan):
     positions += [t['qn'] for t in plan.tempos] + [c['qn'] for c in plan.controls]
     positions += [o[k] for o in plan.occurrences for k in ('start_qn','end_qn')]
     positions += [s[k] for s in plan.display_spans for k in ('start_qn','end_qn')]
-    ppqn = 24
+    def locator(position):
+        locations=plan.document.source.locations
+        for o in plan.occurrences:
+            m=plan.document.measures[o['written_index']]
+            for d in m.directions:
+                if o['start_qn']+d['onset']==position:
+                    return locations.get(d.get('element_id'),{}).get('source_locator','')
+        for o in plan.occurrences:
+            if o['start_qn']<=position<=o['end_qn']:
+                return locations.get(o['measure_uid'],{}).get('source_locator','/score-partwise[1]')
+        return '/score-partwise[1]'
+    ppqn = 1
     for position in positions:
         ppqn = math.lcm(ppqn, Q(position).denominator)
         if ppqn > 32767:
-            fail('有理数时间不能在 PPQN≤32,767 下精确编码', code='MIDI_PRECISION')
+            fail('有理数时间不能在 PPQN≤32,767 下精确编码',locator(position),code='MIDI_PRECISION')
+    # Retain a conventional 24 subdivision where it fits, without rejecting an
+    # otherwise exact legal PPQN merely to force that optional subdivision.
+    if math.lcm(24,ppqn)<=32767:
+        ppqn=math.lcm(24,ppqn)
     slots, routes = {}, {}
     available = [i for i in range(16) if i != 9]
     for n in sorted(plan.instances, key=lambda n: (n['onset_qn'], n['id'])):
@@ -50,7 +65,8 @@ def compile_midi(plan):
         key = (n['part_id'], lane)
         if key not in routes:
             if len(routes) == len(available):
-                fail('同音重叠超过已验证 SMF 通道路由容量（15）', code='MIDI_ROUTING')
+                fail('同音重叠超过已验证 SMF 通道路由容量（15）',
+                     plan.document.source.locations[n['element_ids'][0]]['source_locator'],code='MIDI_ROUTING')
             routes[key] = available[len(routes)]
         n['midi_channel'] = routes[key]
     events, event_map = [], []
@@ -70,7 +86,7 @@ def compile_midi(plan):
         exact = Q(60_000_000) / t['bpm']
         encoded = round(exact)
         if not 1 <= encoded <= 0xffffff:
-            fail('tempo 超出 SMF 表示范围', code='MIDI_PRECISION')
+            fail('tempo 超出 SMF 表示范围',locator(t['qn']),code='MIDI_PRECISION')
         end = plan.tempos[i + 1]['qn'] if i + 1 < len(plan.tempos) else plan.duration_qn
         errors.append(dict(qn=[t['qn'].numerator, t['qn'].denominator], microseconds=encoded,
                            microseconds_error=float(encoded - exact),

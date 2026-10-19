@@ -1,9 +1,20 @@
 """MusicXML playback uses the existing SoundFont PCM and device DAC clock."""
 import asyncio
+from functools import wraps
 from .audio import Audio
 from .render import render, audible_notes
 from .midi_compile import sound_score
 from .score_mapping import json_value
+
+
+def serialized(method):
+    @wraps(method)
+    async def command(self,*args,**kwargs):
+        async with self.command_lock:
+            if self.closed:
+                raise ValueError('应用已关闭')
+            return await method(self,*args,**kwargs)
+    return command
 
 
 class ScorePlayer:
@@ -17,6 +28,7 @@ class ScorePlayer:
         self.seq = 0
         self.closed = False
         self.phase = 'empty'
+        self.command_lock=asyncio.Lock()
         if plan is not None:
             self.install(plan, pcm)
 
@@ -28,21 +40,26 @@ class ScorePlayer:
         self.plan, self.score, self.config = plan, score, config
         self.phase = 'ready'
 
+    @serialized
     async def play(self):
         if self.closed or self.plan is None:
             raise ValueError('请先打开乐谱')
         if self.audio.clock()[2] or self.audio.position >= self.plan.duration_s:
             self.audio.set_position(0.)
+        if self.audio.loop['enabled'] and not self.audio.loop['a_s']<=self.audio.position<self.audio.loop['b_s']:
+            self.audio.set_position(self.audio.loop['a_s'])
         self.audio.start()
         self.phase = 'playing'
         return self.get_transport()
 
+    @serialized
     async def pause(self):
         await self.audio.fade_halt()
         if self.plan:
             self.phase = 'paused'
         return self.get_transport()
 
+    @serialized
     async def stop(self):
         await self.audio.fade_halt()
         if self.plan:
@@ -50,9 +67,12 @@ class ScorePlayer:
             self.phase = 'ready'
         return self.get_transport()
 
-    async def seek(self, seconds):
+    @serialized
+    async def seek(self, seconds, expected_playback_revision=None):
         if self.plan is None:
             raise ValueError('请先打开乐谱')
+        if expected_playback_revision and self.plan.revision!=expected_playback_revision:
+            raise ValueError('谱面跳转已过期')
         was_playing = self.audio.playing
         await self.audio.fade_halt()
         seconds = max(0., min(self.plan.duration_s, float(seconds)))
@@ -66,7 +86,7 @@ class ScorePlayer:
 
     async def seek_score(self, element_id, occurrence_id=None):
         target = self.plan.seek_target(str(element_id), self.audio.clock()[0], occurrence_id)
-        transport = await self.seek(target['start_s'])
+        transport = await self.seek(target['start_s'],self.plan.revision)
         return dict(transport, seek_target=json_value(target))
 
     def set_volume(self, volume):
@@ -76,14 +96,22 @@ class ScorePlayer:
         self.audio.volume = value
         return self.get_transport()
 
-    def set_loop(self, enabled, a_s, b_s):
+    async def set_loop(self, enabled, a_s, b_s):
         if self.plan is None:
             raise ValueError('请先打开乐谱')
         a, b = float(a_s), float(b_s)
         if not 0 <= a < b <= self.plan.duration_s or b - a < .5:
             raise ValueError('循环区间至少 0.5 秒，且不能超出曲目')
-        self.audio.loop = dict(enabled=bool(enabled), a_s=a, b_s=b)
-        return self.get_transport()
+        async with self.command_lock:
+            resume=self.audio.playing
+            position=await self.audio.fade_halt()
+            self.audio.loop = dict(enabled=bool(enabled), a_s=a, b_s=b)
+            if enabled and not a<=position<b:
+                position=a
+            self.audio.set_position(position)
+            if resume:
+                self.audio.start()
+            return self.get_transport()
 
     async def configure(self, changes):
         config = dict(self.config, **changes)

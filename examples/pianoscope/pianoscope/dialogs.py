@@ -2,15 +2,15 @@
 import sys
 from pathlib import Path
 
-def choose_path(auto_cancel=False,folder=False):
+def choose_path(auto_cancel=False,folder=False,extensions=None,label='MIDI'):
     if sys.platform == 'darwin':
         from AppKit import NSOpenPanel, NSModalResponseOK, NSModalPanelRunLoopMode
         from Foundation import NSTimer, NSURL, NSRunLoop
         panel = NSOpenPanel.openPanel()
         panel.setCanChooseFiles_(not folder); panel.setCanChooseDirectories_(folder)
         panel.setAllowsMultipleSelection_(False)
-        panel.setTitle_('选择 MIDI 文件夹' if folder else '打开 MIDI')
-        panel.setAllowedFileTypes_(None if folder else ['mid', 'midi'])
+        panel.setTitle_('选择 '+label+' 文件夹' if folder else '打开'+label)
+        panel.setAllowedFileTypes_(None if folder else (extensions or ['mid', 'midi']))
         timer = None
         if auto_cancel:
             timer = NSTimer.scheduledTimerWithTimeInterval_repeats_block_(.25, False, lambda _: panel.cancel_(None))
@@ -23,7 +23,7 @@ def choose_path(auto_cancel=False,folder=False):
         from tkinter.filedialog import askopenfilename,askdirectory
         root = tk.Tk(); root.withdraw()
         try:
-            value = askdirectory(title='选择 MIDI 文件夹') if folder else askopenfilename(filetypes=[('MIDI', '*.mid *.midi')])
+            value = askdirectory(title='选择 '+label+' 文件夹') if folder else askopenfilename(filetypes=[(label, ' '.join('*.'+ext for ext in (extensions or ['mid','midi'])))])
             return Path(value) if value else None
         finally: root.destroy()
     except Exception as exc:
@@ -44,7 +44,7 @@ def before_window_close(title, callback):
 
 def choose_score_path(title,format,auto_cancel=False):
     """Native save/overwrite confirmation; no paths cross the JS binding."""
-    if format not in ('pdf','musicxml'):raise ValueError('无效导出格式')
+    if format not in ('pdf','musicxml','xml','mxl','mid'):raise ValueError('无效导出格式')
     filename=''.join(c for c in title if c not in '/\\:\0')[:80] or '练习谱'
     if sys.platform=='darwin':
         from AppKit import NSSavePanel,NSModalResponseOK,NSModalPanelRunLoopMode

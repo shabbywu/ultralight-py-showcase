@@ -73,6 +73,12 @@ def parse_score(source, settings=None, cancelled=lambda: False):
     def error(node, message):
         fail(message, source.locations.get(node.get('_ps_id'), {}).get('source_locator', ''))
     for n in root.iter():
+        if n.tag in ('creator','rights','credit'):
+            diagnostics.append(dict(code='METADATA_NOT_DISPLAYED',message='此元数据未在谱面显示，原件完整保留：'+n.tag,
+                                    source_locator=source.locations[n.get('_ps_id')]['source_locator']))
+        if n.tag=='lyric':
+            diagnostics.append(dict(code='DISPLAY_UNVERIFIED',message='歌词按源交给排版器；完整显示尚未单独验收，原件保留',
+                                    source_locator=source.locations[n.get('_ps_id')]['source_locator']))
         if 'time-only' in n.attrib or n.tag=='note' and any(k in n.attrib for k in ('attack','release','pizzicato','end-dynamics')):
             error(n,'条件起音／额外演奏偏移不在首版执行范围')
         if n.tag=='tie' and n.get('type') not in ('start','stop'):
@@ -120,7 +126,7 @@ def parse_score(source, settings=None, cancelled=lambda: False):
             cursor = end = Q(0)
             chord_onset = None
             elements, directions = [], []
-            forward, repeat_times = False, 0
+            forward, repeat_times, explicit_forward = False, 0, False
             endings = active_endings
             for item in measure:
                 tag = item.tag
@@ -233,6 +239,10 @@ def parse_score(source, settings=None, cancelled=lambda: False):
                     if pos < 0:
                         error(item, 'direction offset 越过小节开始')
                     scope = f'{pid}:{item.findtext("staff", "1")}'
+                    if sound is not None and sound.get('forward-repeat')=='yes':
+                        if pos:
+                            error(sound,'首版隐含前反复必须位于小节起点')
+                        forward=True
                     if sound is not None:
                         for key in ('tempo', 'dynamics', 'damper-pedal'):
                             if sound.get(key) is not None:
@@ -280,9 +290,10 @@ def parse_score(source, settings=None, cancelled=lambda: False):
                     repeat = item.find('repeat')
                     if repeat is not None:
                         if repeat.get('direction') == 'forward':
-                            if forward:
+                            if explicit_forward:
                                 error(repeat,'同一小节重复的前反复不明确')
                             forward = True
+                            explicit_forward=True
                         elif repeat.get('direction') == 'backward':
                             if repeat_times:
                                 error(repeat,'同一小节重复的后反复不明确')

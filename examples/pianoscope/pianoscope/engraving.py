@@ -10,11 +10,15 @@ import ctypes.util
 import math
 import re
 import xml.etree.ElementTree as ET
-from .notation import NotationError
+from .score_source import ScoreInputError as NotationError
 
 SVG = 'http://www.w3.org/2000/svg'
 XLINK = 'http://www.w3.org/1999/xlink'
 RESOURCES = Path(__file__).parent / 'resources'
+
+
+def deny_external_resource(url, resource_type):
+    raise NotationError('排版资源禁止外部读取：' + str(resource_type))
 
 
 def cairo_module():
@@ -100,7 +104,7 @@ def outline_text(root,resource_path):
     font.close()
 
 
-def geometry(svg):
+def geometry(svg, hidden_ids=()):
     from fontTools.svgLib.path import parse_path
     from fontTools.pens.boundsPen import BoundsPen
     root = ET.fromstring(svg)
@@ -133,6 +137,8 @@ def geometry(svg):
                 if kind not in ('note', 'rest', 'mRest'):
                     continue
                 eid = elem.attrib['id']
+                if eid in hidden_ids:
+                    continue
                 head = elem.find(f"{{{SVG}}}g[@class='notehead']/{{{SVG}}}use")
                 if head is not None:
                     transform = head.attrib['transform']
@@ -152,7 +158,7 @@ def geometry(svg):
                     if rect is None:
                         raise ValueError('缺少休止几何：'+eid)
                     bounds = box(rect)
-                item = dict(event_id=eid,system=sid,measure_id=mid,bbox=bounds)
+                item = dict(event_id=eid,system=sid,measure_id=mid,bbox=bounds,kind=kind)
                 glyphs.append(item); local.append(bounds)
             # Barlines give true measure extents, including empty space/rests.
             paths = measure.findall(f"{{{SVG}}}g[@class='barLine']/{{{SVG}}}path")
@@ -163,7 +169,7 @@ def geometry(svg):
     return dict(width=width,height=height,systems=systems,measures=measures,glyphs=glyphs)
 
 
-def engrave(xml, title, directory, cancelled=lambda:False, caption=None, layout_options=None):
+def engrave(xml, title, directory, cancelled=lambda:False, caption=None, layout_options=None, hidden_ids=()):
     import verovio
     cairo = cairo_module()
     directory = Path(directory); directory.mkdir(parents=True,exist_ok=True)
@@ -182,7 +188,7 @@ def engrave(xml, title, directory, cancelled=lambda:False, caption=None, layout_
     decoded_bytes=0;image_scale=2
     for page in range(1,count+1):
         if cancelled(): raise InterruptedError('已取消')
-        svg=toolkit.renderToSVG(page); data=geometry(svg)
+        svg=toolkit.renderToSVG(page); data=geometry(svg,hidden_ids)
         if page==1:
             while image_scale>.5 and count*math.ceil(data['width']*image_scale)*math.ceil(data['height']*image_scale)*4>128*1024*1024:image_scale-=.25
         data['image_scale']=image_scale
@@ -200,10 +206,12 @@ def engrave(xml, title, directory, cancelled=lambda:False, caption=None, layout_
         root.append(text_paths(f'{page} / {count}',data['width']/2-20,data['height']-22,11))
         svg=ET.tostring(root,encoding='utf-8')
         (directory/f'page-{page}.svg').write_bytes(svg)
-        cairo.svg2pdf(bytestring=svg,write_to=str(directory/f'page-{page}.pdf'),
-                      output_width=210/25.4*96,output_height=297/25.4*96)
+        cairo.surface.PDFSurface.convert(bytestring=svg,write_to=str(directory/f'page-{page}.pdf'),
+                      output_width=210/25.4*96,output_height=297/25.4*96,
+                      url_fetcher=deny_external_resource)
         # Same SVG and outer viewBox; rasterize at 2x for high-DPI Canvas.
-        cairo.svg2png(bytestring=svg,write_to=str(directory/f'page-{page}.png'),scale=image_scale)
+        cairo.surface.PNGSurface.convert(bytestring=svg,write_to=str(directory/f'page-{page}.png'),
+                      scale=image_scale,url_fetcher=deny_external_resource)
         pages.append(data)
     from pypdf import PdfWriter
     writer=PdfWriter()
