@@ -18,6 +18,18 @@ XML_ID = '{http://www.w3.org/XML/1998/namespace}id'
 ID_REFERENCES = {'part', 'midi-instrument', 'instrument', 'midi-device'}
 
 
+def legal_id(value):
+    """XML 1.0 NCName, including legal non-ASCII source IDs."""
+    def start(c):
+        n=ord(c)
+        return c=='_' or 'A'<=c<='Z' or 'a'<=c<='z' or any(a<=n<=b for a,b in (
+            (0xc0,0xd6),(0xd8,0xf6),(0xf8,0x2ff),(0x370,0x37d),(0x37f,0x1fff),
+            (0x200c,0x200d),(0x2070,0x218f),(0x2c00,0x2fef),(0x3001,0xd7ff),
+            (0xf900,0xfdcf),(0xfdf0,0xfffd),(0x10000,0xeffff)))
+    return bool(value) and start(value[0]) and all(start(c) or c in '-.' or '0'<=c<='9'
+        or ord(c)==0xb7 or 0x300<=ord(c)<=0x36f or 0x203f<=ord(c)<=0x2040 for c in value[1:])
+
+
 class ScoreInputError(ValueError):
     def __init__(self, message, code='SCORE_INVALID', locator='', element_id=''):
         super().__init__(message)
@@ -72,7 +84,18 @@ class SourceDocument:
 def read_source(path, cancelled=lambda: False):
     path = Path(path)
     with path.open('rb') as stream:
-        data = stream.read(MAX_INPUT + 1)
+        pieces, size = [], 0
+        while True:
+            if cancelled():
+                raise InterruptedError('已取消')
+            chunk = stream.read(min(64 * 1024, MAX_INPUT + 1 - size))
+            if not chunk:
+                break
+            pieces.append(chunk)
+            size += len(chunk)
+            if size > MAX_INPUT:
+                fail('乐谱文件超过 10 MiB', code='SCORE_LIMIT')
+        data = b''.join(pieces)
     return source_from_bytes(data, path.name, cancelled)
 
 
@@ -94,7 +117,8 @@ def source_from_bytes(data, name='score.musicxml', cancelled=lambda: False):
                     fail('MXL 超过 256 个条目', code='SCORE_LIMIT')
                 names = set()
                 total = 0
-                payload = {}
+                declared_total = 0
+                info_by_name = {}
                 for info in infos:
                     if cancelled():
                         raise InterruptedError('已取消')
@@ -110,9 +134,19 @@ def source_from_bytes(data, name='score.musicxml', cancelled=lambda: False):
                     names.add(normalized)
                     if info.is_dir():
                         continue
+                    declared_total += info.file_size
+                    if declared_total > MAX_UNPACKED:
+                        fail('MXL 声明总解压超过 32 MiB', info.filename, 'SCORE_LIMIT')
                     if info.file_size > MAX_ENTRY or info.file_size > max(1, info.compress_size) * 100:
                         fail('MXL 单项大小／解压倍率超过限制', info.filename, 'SCORE_LIMIT')
-                    # Actual streaming counts, including entries not used as the score.
+                    info_by_name[normalized] = info
+                def read_entry(name):
+                    nonlocal total
+                    if name not in info_by_name:
+                        fail('MXL 必需条目不存在', name, 'SCORE_CONTAINER')
+                    info = info_by_name[name]
+                    # Only the container and selected score are inflated. Actual
+                    # byte counts still enforce limits independently of metadata.
                     chunks, size = [], 0
                     with archive.open(info) as stream:
                         while True:
@@ -126,10 +160,8 @@ def source_from_bytes(data, name='score.musicxml', cancelled=lambda: False):
                             if size > MAX_ENTRY or total > MAX_UNPACKED or size > max(1, info.compress_size) * 100:
                                 fail('MXL 实际解压大小／倍率超过限制', info.filename, 'SCORE_LIMIT')
                             chunks.append(chunk)
-                    payload[normalized] = b''.join(chunks)
-                if 'META-INF/container.xml' not in payload:
-                    fail('MXL 缺少 META-INF/container.xml', code='SCORE_CONTAINER')
-                container = safe_xml(payload['META-INF/container.xml'])
+                    return b''.join(chunks)
+                container = safe_xml(read_entry('META-INF/container.xml'))
                 if container.tag.split('}')[-1] != 'container':
                     fail('MXL container 根节点错误', code='SCORE_CONTAINER')
                 roots = [n for n in container.iter() if n.tag.split('}')[-1] == 'rootfile'
@@ -137,9 +169,13 @@ def source_from_bytes(data, name='score.musicxml', cancelled=lambda: False):
                 if len(roots) != 1:
                     fail('MXL 必须只有一个明确的乐谱入口', code='SCORE_CONTAINER')
                 entry = roots[0].get('full-path', '')
-                if entry not in payload:
+                p = PurePosixPath(entry)
+                if p.is_absolute() or '..' in p.parts or '\\' in entry or ':' in entry:
+                    fail('MXL 入口路径不安全', entry, 'SCORE_CONTAINER')
+                entry = str(p)
+                if entry not in info_by_name:
                     fail('MXL 乐谱入口不存在', entry, 'SCORE_CONTAINER')
-                xml = payload[entry]
+                xml = read_entry(entry)
         except (zipfile.BadZipFile, RuntimeError, OSError) as exc:
             raise ScoreInputError('MXL 容器损坏：' + str(exc), 'SCORE_CONTAINER') from exc
     root = safe_xml(xml)
@@ -154,7 +190,7 @@ def source_from_bytes(data, name='score.musicxml', cancelled=lambda: False):
         if cancelled():
             raise InterruptedError('已取消')
         original_id = node.get('id') or node.get(XML_ID)
-        valid = node.tag not in ID_REFERENCES and original_id and re.fullmatch(r'[A-Za-z_][A-Za-z0-9_.-]*', original_id) and counts[original_id] == 1
+        valid = node.tag not in ID_REFERENCES and legal_id(original_id) and counts[original_id] == 1
         internal = original_id if valid else 'ps-' + hashlib.sha256((digest + locator).encode()).hexdigest()[:24]
         locations[internal] = dict(source_locator=locator, original_xml_id=original_id, tag=node.tag)
         if original_id and not valid and node.tag not in ID_REFERENCES:
@@ -168,7 +204,9 @@ def source_from_bytes(data, name='score.musicxml', cancelled=lambda: False):
         for child in list(node):
             counter[child.tag] += 1
             child_path = f'{locator}/{child.tag}[{counter[child.tag]}]'
-            if child.tag in ('{http://www.w3.org/2001/XInclude}include', 'image', 'link', 'bookmark'):
+            if child.tag in ('{http://www.w3.org/2001/XInclude}include', 'image', 'credit-image', 'link', 'bookmark'):
+                # Even omitted resources retain an internal identity/location.
+                visit(child, child_path)
                 node.remove(child)
                 diagnostics.append(dict(code='RESOURCE_NOT_LOADED', message='外部资源不加载，原件保留', source_locator=child_path))
                 continue

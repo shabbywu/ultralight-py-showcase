@@ -32,10 +32,10 @@ def temporal():
     backup = '<backup><duration>48</duration></backup>'
     measures = []
     measures.append('<measure id="pickup" number="0" implicit="yes">' + ATTR +
-                    '<direction><sound tempo="120"/></direction>' + note('pickup-g', ('G', 0, 4)) +
+                    '<sound tempo="120"/>' + note('pickup-g', ('G', 0, 4)) +
                     '<backup><duration>12</duration></backup>' + note('pickup-rest', staff=2, voice='2') + '</measure>')
     a = '<barline location="left"><repeat direction="forward"/></barline>'
-    a += '<direction><sound tempo="120"/></direction><direction><offset>24</offset><sound tempo="60"/></direction>'
+    a += '<sound tempo="120"/><sound tempo="60"><offset>24</offset></sound>'
     a += '<direction><direction-type><pedal type="start" line="yes"/></direction-type></direction>'
     a += note('a-long', ('C', 0, 5), 48, 'whole', tie=('start',))
     a += note('a-chord-short', ('E', 0, 5), 24, 'half', chord=True)
@@ -48,8 +48,8 @@ def temporal():
     b += '<barline location="right"><ending number="1" type="stop"/><repeat direction="backward" times="2"/></barline>'
     measures.append('<measure id="B" number="2">' + b + '</measure>')
     c = '<barline location="left"><ending number="2" type="start"/></barline>'
-    c += '<direction><offset>12</offset><sound tempo="90"/></direction>'
-    c += '<direction><offset>24</offset><sound damper-pedal="no"/></direction>'
+    c += '<sound tempo="90"><offset>12</offset></sound>'
+    c += '<sound damper-pedal="no"><offset>24</offset></sound>'
     # Same voice changes staff for the second ending tie continuation.
     c += note('c-tie-cross', ('C', 0, 5), 24, 'half', staff=2, tie=('stop',))
     c += note('c-next', ('D', 0, 5), 24, 'half')
@@ -74,7 +74,7 @@ def printed():
     measures = []
     melody = [('C', 0, 5), ('E', 0, 5), ('G', 0, 5), ('D', 0, 5), ('F', 0, 5), ('A', 0, 5)]
     for bar in range(24):
-        content = ATTR + '<direction><sound tempo="120"/></direction>' if bar == 0 else ''
+        content = ATTR + '<sound tempo="120"/>' if bar == 0 else ''
         if bar in (4, 8, 16, 20):
             content += '<print new-system="yes"/>'
         if bar == 12:

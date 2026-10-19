@@ -31,6 +31,8 @@ def compile_midi(plan):
     positions = [plan.duration_qn]
     positions += [n[k] for n in plan.instances for k in ('onset_qn', 'key_off_qn')]
     positions += [t['qn'] for t in plan.tempos] + [c['qn'] for c in plan.controls]
+    positions += [o[k] for o in plan.occurrences for k in ('start_qn','end_qn')]
+    positions += [s[k] for s in plan.display_spans for k in ('start_qn','end_qn')]
     ppqn = 24
     for position in positions:
         ppqn = math.lcm(ppqn, Q(position).denominator)
@@ -58,6 +60,12 @@ def compile_midi(plan):
         if record:
             event_map.append(dict(record, tick=int(tick)))
     errors = []
+    previous_meter=None
+    for o in plan.occurrences:
+        meter=plan.document.measures[o['written_index']].meter
+        if meter!=previous_meter:
+            add(o['start_qn']*ppqn,0,b'\xff\x58\x04'+bytes((meter[0],int(math.log2(meter[1])),24,8)),None)
+            previous_meter=meter
     for i, t in enumerate(plan.tempos):
         exact = Q(60_000_000) / t['bpm']
         encoded = round(exact)
@@ -86,7 +94,8 @@ def compile_midi(plan):
                 dict(kind=kind, instance_id=n['id'], channel=ch, pitch=n['pitch'], element_ids=n['element_ids']))
     note_track = encode_track(events, end_tick)
     plan.midi_bytes = b'MThd' + struct.pack('>IHHH', 6, 1, 2, ppqn) + tempo_track + note_track
-    plan.midi_event_map = event_map
+    plan.midi_event_map = [dict(record,tick=tick,track=1,event_index=i)
+                          for i,(tick,priority,ordinal,payload,record) in enumerate(sorted(events,key=lambda e:e[:3])) if record]
     plan.midi_precision = dict(ppqn=ppqn, tempos=errors, seconds_error_bound=sum(abs(e['segment_seconds_error']) for e in errors))
     return plan.midi_bytes
 
@@ -109,6 +118,6 @@ def sound_score(plan):
     meters = [dict(tick=int(o['start_qn'] * ppqn), numerator=plan.document.measures[o['written_index']].meter[0],
                    denominator=plan.document.measures[o['written_index']].meter[1]) for o in plan.occurrences]
     return Score(plan.document.title, plan.duration_s, tracks, notes, tempos, meters, controls,
-                 warnings=[d['message'] for d in plan.document.diagnostics],
+                 warnings=[d['message'] for d in plan.diagnostics],
                  score_id=plan.revision, source_fingerprint=plan.document.source.sha256,
                  ppqn=ppqn, duration_tick=int(plan.duration_qn * ppqn))

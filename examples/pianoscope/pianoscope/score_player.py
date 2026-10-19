@@ -104,6 +104,11 @@ class ScorePlayer:
 
     def get_transport(self):
         seconds, tail, ended = self.audio.clock()
+        if self.phase=='playing' and (not self.audio.ready or self.audio.stream is not None and not self.audio.stream.active):
+            self.audio.halt()
+            self.audio.ready=False
+            self.audio.error='声音输出设备已断开'
+            self.phase='error'
         if ended:
             self.audio.halt()
             self.audio.position = self.plan.duration_s
@@ -123,6 +128,7 @@ class ScorePlayer:
                     occurrence_id=occurrence['id'] if occurrence else None,
                     measure_number=occurrence['number'] if occurrence else None,
                     visit_index=occurrence['visit_index'] if occurrence else None,
+                    measure_qn=plan.qn_at_seconds(seconds)-float(occurrence['start_qn']) if occurrence else 0.,
                     active_instance_ids=active, active_element_ids=[s['element_id'] for s in spans],
                     sustained_instance_ids=sustained,
                     audio_ready=self.audio.ready, audio_error=self.audio.error,

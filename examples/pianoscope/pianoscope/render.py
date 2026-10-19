@@ -4,7 +4,10 @@ from .synth import Synth
 
 def audible_notes(score, config):
     tracks={t['id']:t for t in config['tracks']};solo=any(t['solo'] for t in tracks.values())
+    allowed=config.get('allowed_note_ids')
+    allowed=set(allowed) if allowed is not None else None
     return [n for n in score.notes if (config['hand_mode']=='both' or n.hand==config['hand_mode'])
+            and (allowed is None or n.id in allowed)
             and not tracks[n.track_id]['muted'] and (not solo or tracks[n.track_id]['solo'])]
 
 def render(score, config, sample_rate, cancelled=lambda:False, progress=lambda _:None):

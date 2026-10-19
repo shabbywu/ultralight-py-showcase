@@ -17,3 +17,5 @@ Verovio 5.6.0-85e7620 的 renderToMIDI 已实际比较：时间夹具预期 20 �
 G0 保留原建议预算：XML/MXL 10 MiB、容器总解压 32 MiB／256 项／单项 16 MiB／100:1；5,000 源音符／256 小节，20,000 实例／1,024 小节出现，基准 600 秒；当前＋候选 PCM 192 MiB，32 页／每页 2,000 字形，底图和作业各 128 MiB，worker 512 MiB／60 秒。上限不是已实测规模；超限明确拒绝，不裁切后宣称成功。
 
 G0 证据见 [v2 验收](V2_VALIDATION.md)。所有历史人工／性能未测项保持原状态；不把 G0、截图或候选接口记作完整发布通过。P2 仅规划。
+
+偏移规则按 [MusicXML offset 规范](https://www.w3.org/2021/06/musicxml40/musicxml-reference/elements/offset/) 实现：direction/offset 默认仅显示，sound="yes" 才影响播放；sound 的子 offset 覆盖 direction。早期夹具错误已更正并重新执行 G0，旧报告不作最终证明。SourceDocument 的内容身份保持确定；会话发布 revision 另含加载身份，防止相同文件重载后混用旧确认或资源。

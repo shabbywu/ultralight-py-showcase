@@ -22,16 +22,22 @@ class PlaybackPlan:
     midi_bytes: bytes = b''
     midi_event_map: list = field(default_factory=list)
     midi_precision: dict = field(default_factory=dict)
+    diagnostics: list = field(default_factory=list)
+    _tempo_qn: list = field(default_factory=list,repr=False)
+    _tempo_seconds: list = field(default_factory=list,repr=False)
 
     def seconds(self, position):
         position = Q(position)
-        total = Q(0)
-        for i, tempo in enumerate(self.tempos):
-            end = self.tempos[i + 1]['qn'] if i + 1 < len(self.tempos) else position
-            if position <= tempo['qn']:
-                break
-            total += (min(position, end) - tempo['qn']) * 60 / tempo['bpm']
-        return total
+        if not self._tempo_qn:
+            total=Q(0)
+            for i,t in enumerate(self.tempos):
+                if i:
+                    before=self.tempos[i-1]
+                    total+=(t['qn']-before['qn'])*60/before['bpm']
+                self._tempo_qn.append(t['qn'])
+                self._tempo_seconds.append(total)
+        i=max(0,bisect.bisect_right(self._tempo_qn,position)-1)
+        return self._tempo_seconds[i]+(position-self.tempos[i]['qn'])*60/self.tempos[i]['bpm']
 
     @property
     def duration_s(self):
@@ -40,6 +46,12 @@ class PlaybackPlan:
     def occurrence_at(self, seconds):
         index = bisect.bisect_right([o['start_s'] for o in self.occurrences], seconds) - 1
         return self.occurrences[max(0, index)]
+
+    def qn_at_seconds(self, seconds):
+        self.seconds(0)
+        i=max(0,bisect.bisect_right(self._tempo_seconds,seconds)-1)
+        t=self.tempos[i]
+        return float(t['qn'])+max(0.,seconds-float(self._tempo_seconds[i]))*float(t['bpm'])/60
 
     def seek_target(self, element_id, seconds=0, occurrence_id=None):
         candidates = [s for s in self.display_spans if s['element_id'] == element_id]
@@ -91,6 +103,8 @@ def expand_path(measures):
         region = by_start.get(i)
         if region:
             begin, backward, end, times = region
+            if times!=2 and any(measures[j].endings for j in range(begin,end+1)):
+                fail('一／二结尾只能用于两遍反复；其他遍次路径不明确')
             for visit in range(1, times + 1):
                 selected = [j for j in range(begin, end + 1)
                             if not measures[j].endings or visit in measures[j].endings]
@@ -117,6 +131,7 @@ def compile_plan(document, settings=None, cancelled=lambda: False):
     signature = json.dumps(settings, sort_keys=True, ensure_ascii=False)
     revision = hashlib.sha256((document.revision + ':playback-v1:' + signature).encode()).hexdigest()[:24]
     plan = PlaybackPlan(document, [], [], [], [], [], Q(0), revision, settings)
+    plan.diagnostics=list(document.diagnostics)
     # State at each written measure boundary. A jump restores that boundary state;
     # it must not inherit a velocity/pedal/tempo from an unrelated prior visit.
     tempo = Q(str(settings.get('default_tempo', 120)))
@@ -199,11 +214,13 @@ def compile_plan(document, settings=None, cancelled=lambda: False):
                 note['occurrence_ids'].append(occ_id)
             else:
                 if e.tie_stop:
-                    document.diagnostics.append(dict(code='TIE_PATH_REARTICULATION', message='实际路径没有相邻 tie 起点，此段重新起音', element_id=e.id))
+                    plan.diagnostics.append(dict(code='TIE_PATH_REARTICULATION', message='实际路径没有相邻 tie 起点，此段重新起音', element_id=e.id))
                 velocity = velocities[e.part_id]
                 for d in local:
                     if d['kind'] == 'velocity' and d['scope'] == e.part_id and d['onset'] <= e.onset:
                         velocity = int(d['value'])
+                if e.velocity_override is not None:
+                    velocity=e.velocity_override
                 if e.staccato and not (e.tie_start or e.tie_stop):
                     off = on + e.duration / 2
                 note = dict(id=f'i{len(plan.instances) + 1}', element_ids=[e.id], occurrence_ids=[occ_id],

@@ -144,6 +144,7 @@ def main():
                     snapshot = view.evaluate('Gate.last')
                     check('DAC snapshot has overlapping independent instances',len(snapshot['active_instance_ids'])>=3,snapshot)
                     check('actual post-gain output is nonzero',float(abs(player.audio.heard_window()).max())>0)
+                    await asyncio.sleep(.15)
                     screenshot(view,out/'native-playing.png')
                     await view.evaluate_async('piano.pause()')
                     await view.wait_until(lambda:not view.evaluate('Gate.highlights.length'),timeout=3)

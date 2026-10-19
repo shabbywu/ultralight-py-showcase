@@ -2,6 +2,7 @@
 from dataclasses import dataclass, field
 from fractions import Fraction as Q
 import hashlib
+import re
 import xml.etree.ElementTree as ET
 from .score_source import fail
 
@@ -12,6 +13,9 @@ DYNAMICS = dict(zip(('ppp', 'pp', 'p', 'mp', 'mf', 'f', 'ff', 'fff'), (24, 36, 4
 UNSUPPORTED = {'grace', 'unpitched', 'transpose', 'trill-mark', 'turn', 'inverted-turn',
                'mordent', 'inverted-mordent', 'tremolo', 'arpeggiate', 'swing', 'segno', 'coda',
                'senza-misura', 'multiple-rest', 'measure-repeat', 'slash', 'scordatura'}
+UNSUPPORTED.update({'delayed-turn','delayed-inverted-turn','vertical-turn','inverted-vertical-turn',
+                    'schleifer','shake','haydn','other-ornament','glissando','slide','bend',
+                    'hammer-on','pull-off','breath-mark','caesura','play','listen','listening'})
 
 
 @dataclass(frozen=True)
@@ -31,6 +35,7 @@ class ScoreElement:
     staccato: bool = False
     cue: bool = False
     visible: bool = True
+    velocity_override: int | None = None
 
 
 @dataclass
@@ -68,6 +73,16 @@ def parse_score(source, settings=None, cancelled=lambda: False):
     def error(node, message):
         fail(message, source.locations.get(node.get('_ps_id'), {}).get('source_locator', ''))
     for n in root.iter():
+        if 'time-only' in n.attrib or n.tag=='note' and any(k in n.attrib for k in ('attack','release','pizzicato','end-dynamics')):
+            error(n,'条件起音／额外演奏偏移不在首版执行范围')
+        if n.tag=='tie' and n.get('type') not in ('start','stop'):
+            error(n,'tie 的声音关系必须为 start／stop')
+        if n.tag=='octave-shift' and n.get('size','8')!='8':
+            error(n,'首版支持 8va／8vb')
+        if n.tag in ('divisions','duration','offset','alter','octave','fifths','actual-notes','normal-notes') and not re.fullmatch(r'[+-]?(?:\d+(?:\.\d*)?|\.\d+)',(n.text or '').strip()):
+            error(n,'音乐数值必须是 MusicXML 十进制数：'+n.tag)
+        if n.tag=='words' and re.search(r'\bD\s*\.\s*[CS]\s*\.|\bal\s+(?:fine|coda)\b',n.text or '',re.I):
+            error(n,'首版不执行 D.C.／D.S.／Fine／Coda 导航')
         if n.tag in UNSUPPORTED:
             if n.tag == 'transpose' and all(Q(c.text or '0') == 0 for c in n):
                 continue
@@ -168,7 +183,7 @@ def parse_score(source, settings=None, cancelled=lambda: False):
                     if pitch_node is not None:
                         step, octave = pitch_node.findtext('step'), int(pitch_node.findtext('octave', '-10'))
                         alter = Q(pitch_node.findtext('alter', '0'))
-                        if step not in 'CDEFGAB' or alter.denominator != 1:
+                        if step not in ('C','D','E','F','G','A','B') or alter.denominator != 1:
                             error(item, '不支持微分音或非法音高')
                         pitch = 12 * (octave + 1) + dict(C=0, D=2, E=4, F=5, G=7, A=9, B=11)[step] + int(alter)
                         if not 21 <= pitch <= 108:
@@ -187,15 +202,31 @@ def parse_score(source, settings=None, cancelled=lambda: False):
                     numbers = {t.get('number', '1') for t in tied}
                     if len(numbers) > 1:
                         error(item, '一个音符不能有歧义延音编号')
+                    velocity_override=None
+                    if item.get('dynamics') is not None:
+                        try:
+                            dynamics=Q(item.get('dynamics'))
+                        except ValueError:
+                            error(item,'音符 dynamics 必须是明确数值')
+                        if dynamics<0:
+                            error(item,'音符 dynamics 不能为负')
+                        velocity_override=max(1,min(127,round(dynamics*Q(90,100))))
                     elements.append(ScoreElement(item.get('id'), uid, pid, f'{pid}:{staff}', voice,
                         onset, duration, pitch, spelling, 'start' in ties, 'stop' in ties,
                         next(iter(numbers), '1'), item.find('notations/articulations/staccato') is not None,
-                        item.find('cue') is not None, item.get('print-object') != 'no'))
+                        item.find('cue') is not None, item.get('print-object') != 'no',velocity_override))
+                    if item.find('cue') is not None or item.get('print-object')=='no':
+                        diagnostics.append(dict(code='CUE_DISPLAY_ONLY' if item.find('cue') is not None else 'INVISIBLE_PLAYBACK',
+                            message='cue 音符仅展示，不生成起音' if item.find('cue') is not None else '不可见音符保留播放，按源设置不显示',
+                            element_id=item.get('id'),source_locator=source.locations[item.get('id')]['source_locator']))
                 elif tag in ('direction', 'sound'):
                     if divisions is None:
                         error(item, 'direction 前缺少 divisions')
                     sound = item if tag == 'sound' else item.find('sound')
-                    offset = item.findtext('offset', '0')
+                    offset_node=item.find('offset')
+                    # A direction offset defaults to display-only. A sound child
+                    # offset is always musical and overrides its parent direction.
+                    offset = item.findtext('offset','0') if tag=='sound' or offset_node is not None and offset_node.get('sound')=='yes' else '0'
                     if sound is not None and sound.find('offset') is not None:
                         offset = sound.findtext('offset')
                     pos = cursor + Q(offset) / divisions
@@ -207,9 +238,12 @@ def parse_score(source, settings=None, cancelled=lambda: False):
                             if sound.get(key) is not None:
                                 value = sound.get(key)
                                 value = Q(100 if value == 'yes' else 0 if value == 'no' else value)
-                                if key == 'tempo' and value <= 0:
-                                    needs['default_tempo'] = '未提供可执行速度，请确认四分音符／分钟'
-                                    continue
+                                if key == 'tempo' and value == 0:
+                                    if settings.get('default_tempo'):
+                                        value=Q(str(settings['default_tempo']))
+                                    else:
+                                        needs['default_tempo'] = '未提供可执行速度，请确认四分音符／分钟'
+                                        continue
                                 if value < 0 or key == 'damper-pedal' and value > 100:
                                     error(item, '声音参数超出范围')
                                 directions.append(dict(onset=pos, kind=key, value=value, priority=2,
@@ -246,8 +280,12 @@ def parse_score(source, settings=None, cancelled=lambda: False):
                     repeat = item.find('repeat')
                     if repeat is not None:
                         if repeat.get('direction') == 'forward':
+                            if forward:
+                                error(repeat,'同一小节重复的前反复不明确')
                             forward = True
                         elif repeat.get('direction') == 'backward':
+                            if repeat_times:
+                                error(repeat,'同一小节重复的后反复不明确')
                             repeat_times = int(repeat.get('times', '2'))
                             if not 2 <= repeat_times <= 16:
                                 error(repeat, '反复次数必须在 2–16 内')

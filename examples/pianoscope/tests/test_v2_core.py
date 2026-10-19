@@ -63,6 +63,10 @@ def test_smf_independent_reader_matches_manual_note_events():
     assert plan.midi_precision['seconds_error_bound'] == pytest.approx(7 / 3 / 1_000_000)
     assert any(msg.type == 'control_change' and msg.control == 64 and msg.value == 127 for tr in midi.tracks for msg in tr)
     assert len(plan.midi_event_map) >= 40
+    for entry in plan.midi_event_map:
+        event=midi.tracks[entry['track']][entry['event_index']]
+        assert event.type==entry['kind'] if entry['kind']!='cc' else event.type=='control_change'
+        assert event.channel==entry['channel']
 
 
 def test_tie_segment_seek_and_occurrence_policy():
@@ -104,7 +108,7 @@ def test_duplicate_source_note_ids_are_diagnosed_and_unique():
     ('<score-partwise version="4.0">', '<score-partwise version="2.0">'),
     ('<pitch><step>G</step>', '<grace/><pitch><step>G</step>'),
     ('<alter>0</alter>', '<alter>0.5</alter>'),
-    ('<sound tempo="60"/>', '<sound dacapo="yes" tempo="60"/>'),
+    ('<sound tempo="60">', '<sound dacapo="yes" tempo="60">'),
     ('<beats>4</beats>', '<beats>5</beats>'),
     ('<duration>48</duration>', '<duration>49</duration>'),
 ])
@@ -161,3 +165,67 @@ def test_compilation_and_midi_are_deterministic():
     assert compile_midi(a) == compile_midi(b)
     assert a.instances == b.instances and a.display_spans == b.display_spans
     assert a.revision == b.revision
+
+
+def test_midi_precision_limit_uses_real_decimal_sound_offset():
+    text=(FIXTURES/'temporal.musicxml').read_text().replace('<offset>24</offset>','<offset>0.00001</offset>',1)
+    plan=phrase(text)
+    with pytest.raises(ScoreInputError,match='PPQN'):
+        compile_midi(plan)
+
+
+def test_standard_midi_channel_limit_is_independent_of_synth_capacity():
+    import xml.etree.ElementTree as E
+    root=E.fromstring((FIXTURES/'temporal.musicxml').read_bytes())
+    measure=root.find("part/measure[@id='A']")
+    for i in range(14):
+        measure.append(E.fromstring('<backup><duration>48</duration></backup>'))
+        measure.append(E.fromstring(f'<note id="overlap-{i}"><pitch><step>C</step><octave>5</octave></pitch><duration>48</duration><voice>{10+i}</voice><type>whole</type><staff>1</staff></note>'))
+    plan=phrase(E.tostring(root,encoding='unicode'))
+    assert len({e.voice_id for e in plan.document.elements})>4
+    with pytest.raises(ScoreInputError,match='容量'):
+        compile_midi(plan)
+
+
+def test_cue_and_invisible_notes_have_distinct_roles():
+    text=(FIXTURES/'temporal.musicxml').read_text().replace('<note id="pickup-g">','<note id="pickup-g" print-object="no">',1)
+    plan=phrase(text)
+    assert not plan.document.elements[0].visible and plan.instances[0]['element_ids']==['pickup-g']
+    text=(FIXTURES/'temporal.musicxml').read_text().replace('<note id="pickup-g">','<note id="pickup-g"><cue/>',1)
+    plan=phrase(text)
+    assert len(plan.instances)==19
+    assert any(d['code']=='CUE_DISPLAY_ONLY' for d in plan.document.diagnostics)
+
+
+def test_tempo_inverse_is_not_linear_across_long_tie():
+    plan=phrase()
+    for q in (Q(0),Q(1),Q(3),Q(5),Q(6),Q(9),Q(13),Q(16),Q(21)):
+        assert plan.qn_at_seconds(float(plan.seconds(q)))==pytest.approx(float(q))
+    assert plan.qn_at_seconds(4)==pytest.approx(5.5)
+    text=(FIXTURES/'temporal.musicxml').read_text().replace('times="2"','times="3"')
+    with pytest.raises(ScoreInputError,match='结尾'):
+        phrase(text)
+
+
+def test_visual_direction_offset_and_sound_offset_have_different_semantics():
+    text=(FIXTURES/'temporal.musicxml').read_text()
+    source=text.replace('<sound tempo="120"/><sound tempo="60">','<sound tempo="60">',1)
+    sound='<sound tempo="60"><offset>24</offset></sound>'
+    for flag,expected in (('',4.5),(' sound="no"',4.5),(' sound="yes"',3.5)):
+        direction='<direction><direction-type><words>Tempo</words></direction-type><offset'+flag+'>24</offset><sound tempo="60"/></direction>'
+        plan=phrase(source.replace(sound,direction,1))
+        assert plan.occurrences[1]['end_s']==expected
+    override='<direction><direction-type><words>Tempo</words></direction-type><offset sound="yes">24</offset><sound tempo="60"><offset>12</offset></sound></direction>'
+    assert phrase(source.replace(sound,override,1)).occurrences[1]['end_s']==4
+
+
+def test_dotted_metronome_and_note_dynamics_execute_exactly():
+    text=(FIXTURES/'temporal.musicxml').read_text()
+    metronome='<direction><direction-type><metronome><beat-unit>quarter</beat-unit><beat-unit-dot/><per-minute>40</per-minute></metronome></direction-type><offset sound="yes">24</offset></direction>'
+    text=text.replace('<sound tempo="60"><offset>24</offset></sound>',metronome,1)
+    text=text.replace('<note id="pickup-g">','<note id="pickup-g" dynamics="50">',1)
+    plan=phrase(text)
+    assert plan.occurrences[1]['end_s']==3.5
+    assert plan.instances[0]['velocity']==45
+    midi=mido.MidiFile(file=BytesIO(compile_midi(plan)))
+    assert next(msg for tr in midi.tracks for msg in tr if msg.type=='note_on').velocity==45
