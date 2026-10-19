@@ -43,3 +43,23 @@ def test_legal_unicode_source_ids_are_preserved():
     source=source_from_bytes(data)
     assert '音符_甲' in source.locations
     assert parse_score(source).elements[0].id=='音符_甲'
+
+
+def test_native_svg_rasterizer_refuses_external_resource():
+    from pianoscope.engraving import cairo_module, deny_external_resource
+    from pianoscope.score_source import ScoreInputError
+    svg=b'<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><image href="https://example.invalid/forbidden.png" width="10" height="10"/></svg>'
+    with pytest.raises(ScoreInputError,match='外部读取'):
+        cairo_module().surface.PNGSurface.convert(bytestring=svg,url_fetcher=deny_external_resource)
+
+
+def test_input_node_and_zip_entry_count_limits_use_actual_bytes():
+    from pianoscope.score_source import MAX_INPUT
+    with pytest.raises(ScoreInputError,match='10 MiB'):
+        source_from_bytes(b' '* (MAX_INPUT+1))
+    with pytest.raises(ScoreInputError,match='节点'):
+        source_from_bytes(b'<score-partwise version="4.0">'+b'<x/>'*200001+b'</score-partwise>')
+    stream=BytesIO()
+    with zipfile.ZipFile(stream,'w') as z:
+        for i in range(257):z.writestr(str(i),b'x')
+    with pytest.raises(ScoreInputError,match='256'):source_from_bytes(stream.getvalue(),'count.mxl')

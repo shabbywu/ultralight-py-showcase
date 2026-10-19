@@ -152,7 +152,7 @@ def compile_plan(document, settings=None, cancelled=lambda: False):
             values = {d['value'] for d in group}
             # A pedal change deliberately has two events in source order.
             if len(values) > 1 and not (kind == 'damper-pedal' and len({d['element_id'] for d in group}) == 1):
-                fail('同位置同优先级播放参数冲突')
+                fail('同位置同优先级播放参数冲突',document.source.locations.get(group[0]['element_id'],{}).get('source_locator',''))
             for d in group if kind == 'damper-pedal' else group[:1]:
                 result.append(dict(onset=onset, kind=kind, scope=scope, value=d['value']))
         return sorted(result, key=lambda d: d['onset'])

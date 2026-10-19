@@ -229,3 +229,10 @@ def test_dotted_metronome_and_note_dynamics_execute_exactly():
     assert plan.instances[0]['velocity']==45
     midi=mido.MidiFile(file=BytesIO(compile_midi(plan)))
     assert next(msg for tr in midi.tracks for msg in tr if msg.type=='note_on').velocity==45
+
+
+@pytest.mark.parametrize('value',['NaN','1/0','forte'])
+def test_malformed_sound_number_has_source_location(value):
+    raw=(FIXTURES/'temporal.musicxml').read_text().replace('tempo="60"','tempo="'+value+'"',1)
+    with pytest.raises(ScoreInputError) as caught:phrase(raw)
+    assert caught.value.issues[0]['source_locator']

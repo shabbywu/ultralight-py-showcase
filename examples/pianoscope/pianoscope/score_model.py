@@ -247,7 +247,10 @@ def parse_score(source, settings=None, cancelled=lambda: False):
                         for key in ('tempo', 'dynamics', 'damper-pedal'):
                             if sound.get(key) is not None:
                                 value = sound.get(key)
-                                value = Q(100 if value == 'yes' else 0 if value == 'no' else value)
+                                try:
+                                    value = Q(100 if value == 'yes' else 0 if value == 'no' else value)
+                                except (ValueError,ZeroDivisionError):
+                                    error(sound,'声音参数必须是明确数值：'+key)
                                 if key == 'tempo' and value == 0:
                                     if settings.get('default_tempo'):
                                         value=Q(str(settings['default_tempo']))
@@ -265,7 +268,10 @@ def parse_score(source, settings=None, cancelled=lambda: False):
                             if not unit or not per:
                                 error(met, 'metronome 不能换算为明确速度')
                             dots = len(met.findall('beat-unit-dot'))
-                            value = Q(per) * unit * (2 - Q(1, 2**dots))
+                            try:
+                                value = Q(per) * unit * (2 - Q(1, 2**dots))
+                            except (ValueError,ZeroDivisionError):
+                                error(met,'metronome 必须是明确数值速度')
                             if value <= 0:
                                 error(met, '速度必须大于零')
                             directions.append(dict(onset=pos, kind='tempo', value=value, priority=1,

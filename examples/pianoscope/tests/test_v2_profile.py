@@ -94,3 +94,36 @@ def test_two_parts_require_confirmation_and_align_by_structure():
     bad=text.replace('<sound tempo="120"/>','<sound tempo="90"/>',1)
     with pytest.raises(ScoreInputError,match='冲突'):
         plan(bad,{'piano_group_confirmed':True})
+
+
+def test_maximum_exact_ppqn_does_not_require_a_24_multiple():
+    text=xml(''.join(note('p'+str(i),duration=32767) for i in range(4)),divisions=32767)
+    text=text.replace('<sound tempo="120"/>','<sound tempo="120"/><sound tempo="60"><offset>1</offset></sound>')
+    p=plan(text)
+    midi=mido.MidiFile(file=BytesIO(compile_midi(p)))
+    assert midi.ticks_per_beat==32767
+
+
+def test_real_source_note_count_boundary():
+    first=note('n0',duration=48,type='whole')
+    rest=''.join(note('n'+str(i),duration=48,type='whole').replace('<pitch>','<chord/><pitch>',1) for i in range(1,5001))
+    source=source_from_bytes(xml(first+rest).encode())
+    with pytest.raises(ScoreInputError,match='5,000'):parse_score(source)
+    assert len(parse_score(source_from_bytes(xml(first+rest[:rest.rfind('<note ')]).encode())).elements)==5000
+
+
+def test_written_measure_and_expanded_occurrence_boundaries():
+    first=xml(note('n0',duration=48,type='whole')).replace('</measure>','<barline location="left"><repeat direction="forward"/></barline></measure>')
+    tail=''.join('<measure id="m'+str(i)+'" number="same">'+note('n'+str(i),duration=48,type='whole')+'</measure>' for i in range(1,256))
+    text=first.replace('</part>',tail+'</part>').replace('<sound tempo="120"/>','<sound tempo="600"/>')
+    text=text.replace('</measure></part>','<barline location="right"><repeat direction="backward" times="4"/></barline></measure></part>')
+    p=plan(text);assert len(p.occurrences)==1024
+    with pytest.raises(ScoreInputError,match='1,024'):plan(text.replace('times="4"','times="5"'))
+    with pytest.raises(ScoreInputError,match='256'):parse_score(source_from_bytes(text.replace('</part>','<measure number="overflow">'+note('extra',duration=48,type='whole')+'</measure></part>').encode()))
+
+
+def test_duration_and_expanded_instance_limits_are_rejected():
+    with pytest.raises(ScoreInputError,match='600'):plan(xml(note('n',duration=48,type='whole')).replace('tempo="120"','tempo="0.1"'))
+    chord=note('c0',duration=48,type='whole')+''.join(note('c'+str(i),duration=48,type='whole').replace('<pitch>','<chord/><pitch>',1) for i in range(1,1251))
+    text=xml(chord+'<barline location="right"><repeat direction="backward" times="16"/></barline>')
+    with pytest.raises(ScoreInputError,match='20,000'):plan(text)
