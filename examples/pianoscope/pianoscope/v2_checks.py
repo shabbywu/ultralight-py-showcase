@@ -23,10 +23,14 @@ async def verify(view,c,args,report):
     check('real MusicXML document published',c.plan is not None)
     check('fixed native binding',version('ultralight-py')=='0.5.0')
     check('no JavaScript errors',not view.evaluate('APP_ERRORS'),view.evaluate('APP_ERRORS'))
-    check('Canvas score rows exist',view.evaluate('App.rows.length')>0)
+    check('default roll is ready without engraving',view.evaluate('App.view==="roll"&&App.rows.length===0') and not c.get_document()['layout_ready'])
+    report['initial_worker']='not_started: lazy staff layout'
+    view.evaluate('document.getElementById("sheetMode").click();true')
+    await view.wait_until(lambda:view.evaluate('App.rows.length>0&&!App.sheetRequest'),timeout=60)
+    check('Canvas score rows exist after staff request',view.evaluate('App.rows.length')>0)
     check('initial load waits for play',not c.audio.playing and c.audio.position==0)
     if args.width<=850:
-        check('small window defaults hide sidebar keyboard and spectrum',view.evaluate('document.getElementById("keyboard").hidden&&document.getElementById("analysis").hidden&&!document.body.classList.contains("sidebar-open")'))
+        check('small window hides sidebar and spectrum; roll needs keyboard',view.evaluate('!document.getElementById("keyboard").hidden&&document.getElementById("analysis").hidden&&!document.body.classList.contains("sidebar-open")'))
     report['viewport']=view.evaluate('({css_width:innerWidth,css_height:innerHeight,dpr:devicePixelRatio,canvas_backing_ratio:CPU_RENDERER?1:Math.min(2,devicePixelRatio)})')
     if platform.system()=='Darwin':
         from AppKit import NSApplication
@@ -52,7 +56,7 @@ async def verify(view,c,args,report):
     original_path=c.active['source_path'];original_token=c.token_for_path(original_path)
     original_hash=c.plan.document.source.sha256
     report['input_sha256']=original_hash
-    report['initial_worker']=c.active['data']['worker_metrics']
+    report['requested_layout_worker']=c.active['data']['worker_metrics']
     await call('piano.seek(2)')
     check('real binding seek',abs(c.audio.position-2)<1e-8)
     target=next(e for e in c.plan.document.elements if e.visible and e.onset>0)
@@ -97,17 +101,16 @@ async def verify(view,c,args,report):
         result=await call('piano.choose_export('+json.dumps(c.plan.document.revision)+',"pdf",true)')
         check('real native save cancel creates no job',result is None and c.plan is before)
         # The invalid PNG is a failure injection into the actual native decoder.
-        keep_resource=c.resource;active_prefix='score-'+c.active['job_id']+'-'
-        position=c.get_transport()['position_s'];pcm=c.audio.pcm;epoch=c.audio.epoch
-        c.resource=lambda name:b'injected invalid PNG' if name.startswith('score-') and not name.startswith(active_prefix) else keep_resource(name)
+        keep_resource=c.resource
+        c.resource=lambda name:b'injected invalid PNG' if name.startswith('score-') else keep_resource(name)
         try:
             view.evaluate('App.load("demo:harmonics");true')
-            await view.wait_until(lambda:view.evaluate('App.loadJob===null'),timeout=40)
-            check('decode failure preserves old audio/layout',c.plan is before and c.audio.pcm is pcm and c.audio.epoch==epoch and c.get_transport()['position_s']>position)
+            await view.wait_until(lambda:c.plan.document.source.sha256!=original_hash and view.evaluate('App.loadJob===null&&!App.sheetRequest'),timeout=40)
+            check('decode failure keeps new roll/audio usable without partial staff layout',not c.get_document()['layout_ready'] and view.evaluate('App.rows.length===0') and not c.audio.playing and c.audio.position==0)
         finally:c.resource=keep_resource
-        view.evaluate('App.load("demo:harmonics");true')
-        await view.wait_until(lambda:c.plan.document.source.sha256!=original_hash and view.evaluate('App.loadJob===null'),timeout=40)
-        check('complete candidate publishes without autoplay',c.audio.position==0 and not c.audio.playing and view.evaluate('App.document.source_sha256')==c.plan.document.source.sha256)
+        view.evaluate('document.querySelector("#sheet .sheet-status button").click();true')
+        await view.wait_until(lambda:view.evaluate('App.rows.length>0&&!App.sheetRequest'),timeout=40)
+        check('complete lazy layout publishes without autoplay',c.audio.position==0 and not c.audio.playing and view.evaluate('App.document.source_sha256')==c.plan.document.source.sha256)
         for element_id in ('b-rest','B','c-tie-cross'):
             # These targets exercise distinct seek roles through the actual binding.
             if element_id=='b-rest':
@@ -119,6 +122,7 @@ async def verify(view,c,args,report):
         check('explicit second occurrence binding',second['seek_target']['occurrence_id']=='o4' and abs(second['position_s']-7.5)<1e-8)
         view.evaluate('App.load('+json.dumps(original_token)+');true')
         await view.wait_until(lambda:c.plan.document.source.sha256==original_hash and view.evaluate('App.loadJob===null'),timeout=40)
+        await view.wait_until(lambda:view.evaluate('App.rows.length>0&&!App.sheetRequest'),timeout=40)
         await call('piano.set_loop(true,.5,1)');await call('piano.seek(.5)');await call('piano.play()')
         await view.wait_until(lambda:'小节' in view.evaluate('document.getElementById("loopVisits").textContent'),timeout=3)
         check('loop endpoints display occurrence labels',True,view.evaluate('document.getElementById("loopVisits").textContent'))

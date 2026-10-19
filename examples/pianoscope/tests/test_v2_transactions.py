@@ -21,12 +21,21 @@ def wait(c,j,phase='candidate_ready'):
     raise AssertionError('job timed out')
 
 
-def load(c,path):
+def layout(c):
+    j=c.begin_score_layout(c.plan.document.revision)
+    assert wait(c,j,'layout_ready')['phase']=='layout_ready',c.get_job(j['job_id'])
+    candidate=c.get_layout_candidate(j['job_id'])
+    c.publish_score_layout(j['job_id'],candidate['source_revision'],candidate['layout_revision'])
+    return j
+
+
+def load(c,path,engrave=True):
     j=c.begin_score_load(c.token_for_path(path))
     state=wait(c,j)
     assert state['phase']=='candidate_ready',state
     candidate=c.get_candidate(j['job_id'])
     asyncio.run(c.publish_score_load(j['job_id'],candidate['source_sha256']))
+    if engrave:layout(c)
     return j
 
 
@@ -238,6 +247,55 @@ def test_actual_workers_are_deterministic_and_reject_thirty_three_pages(tmp_path
     folder=tmp_path/'overflow';folder.mkdir();(folder/'request.json').write_text(json.dumps(dict(source_path=str(path))))
     with pytest.raises(ScoreInputError,match='32 页'):run_preparation(folder)
     assert not (folder/'score.pdf').exists()
+
+
+def test_roll_load_skips_worker_and_pdf_export_is_independent(controller,tmp_path,monkeypatch):
+    c=controller
+    real=c._prepare_layout
+    calls=[]
+    def recorded(*args):
+        calls.append(True)
+        return real(*args)
+    monkeypatch.setattr(c,'_prepare_layout',recorded)
+    load(c,FIXTURES/'expressions.musicxml',engrave=False)
+    assert not calls and not c.get_document()['layout_ready']
+    assert not calls and c.get_document()['pages']==0
+    assert not list(c.active['folder'].glob('*.png')) and not list(c.active['folder'].glob('*.pdf'))
+    pcm,epoch,plan=c.audio.pcm,c.audio.epoch,c.plan
+    target=tmp_path/'lazy.pdf'
+    monkeypatch.setattr('pianoscope.v2_session.choose_score_path',lambda *a,**k:target)
+    chosen=c.choose_export(c.plan.document.revision,'pdf')
+    job=c.begin_export(chosen['snapshot_id'],'pdf',chosen['target_token'])
+    assert wait(c,job,'completed')['phase']=='completed',c.get_job(job['job_id'])
+    from pypdf import PdfReader
+    assert len(PdfReader(target).pages)>0 and len(calls)==1
+    assert c.plan is plan and c.audio.pcm is pcm and c.audio.epoch==epoch and not c.get_document()['layout_ready']
+    layout(c)
+    assert len(calls)==2 and c.get_document()['layout_ready']
+    assert c.plan is plan and c.audio.pcm is pcm and c.audio.epoch==epoch
+    assert c.begin_score_layout(plan.document.revision)['ready']
+
+
+def test_lazy_layout_cancel_stale_and_failure_preserve_published_audio(controller,monkeypatch):
+    c=controller;load(c,FIXTURES/'temporal.musicxml',engrave=False)
+    pcm,epoch=c.audio.pcm,c.audio.epoch
+    j=c.begin_score_layout(c.plan.document.revision)
+    assert wait(c,j,'layout_ready')['phase']=='layout_ready'
+    candidate=c.get_layout_candidate(j['job_id'])
+    c.cancel_job(j['job_id'])
+    with pytest.raises(ValueError,match='过期'):c.publish_score_layout(j['job_id'],candidate['source_revision'],candidate['layout_revision'])
+    assert c.audio.pcm is pcm and c.audio.epoch==epoch and not c.get_document()['layout_ready']
+    j=c.begin_score_layout(c.plan.document.revision)
+    assert wait(c,j,'layout_ready')['phase']=='layout_ready'
+    candidate=c.get_layout_candidate(j['job_id'])
+    load(c,FIXTURES/'printed.musicxml',engrave=False)
+    with pytest.raises(ValueError,match='过期'):c.publish_score_layout(j['job_id'],candidate['source_revision'],candidate['layout_revision'])
+    pcm,epoch=c.audio.pcm,c.audio.epoch
+    def failed(*args):raise ValueError('native layout failure')
+    monkeypatch.setattr(c,'_prepare_layout',failed)
+    j=c.begin_score_layout(c.plan.document.revision)
+    assert wait(c,j,'layout_ready')['phase']=='failed'
+    assert c.audio.pcm is pcm and c.audio.epoch==epoch and not c.get_document()['layout_ready']
 
 
 def test_practice_settings_reopen_preserves_scope_labels_and_undo_mode(controller):

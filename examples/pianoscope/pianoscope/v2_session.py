@@ -34,7 +34,8 @@ class Controller(ScorePlayer):
         self.pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix='pianoscope-score')
         self.preparation_lock = threading.Lock()
         self.jobs, self.paths, self.targets = {}, {}, {}
-        self.candidates, self.confirmations = {}, {}
+        self.candidates, self.confirmations, self.layout_candidates = {}, {}, {}
+        self.current_layout_job = None
         self.current_job = None
         self.generation = self.configuration_generation = self.folder_generation = 0
         self.active = None
@@ -98,6 +99,8 @@ class Controller(ScorePlayer):
             raise ValueError('应用已关闭')
         if self.current_job:
             self.cancel_job(self.current_job)
+        if self.current_layout_job:
+            self.cancel_job(self.current_layout_job)
         self.generation += 1
         self.configuration_generation+=1
         generation = self.generation
@@ -120,16 +123,13 @@ class Controller(ScorePlayer):
                 document.revision += ':'+jid
                 if document.needs_confirmation:
                     return dict(confirmation=True,source=source,required=document.needs_confirmation,title=document.title)
-                job['phase'] = 'layout_and_compiling'
-                input_path = folder / ('input' + Path(source.original_name).suffix.lower())
-                input_path.write_bytes(source.original_bytes)
-                request = dict(source_path=str(input_path),original_name=source.original_name,settings=settings,source_revision=document.revision)
-                (folder/'request.json').write_text(json.dumps(request,ensure_ascii=False))
-                result = run_preparation(folder,check)
+                job['phase'] = 'compiling'
                 plan = compile_plan(document,settings,check)
                 compile_midi(plan)
-                if plan.midi_bytes != (folder/'score.mid').read_bytes() or result['source_sha256'] != source.sha256:
-                    raise ValueError('候选编译／来源版本不一致')
+                # Playback can publish without engraving. No native notation
+                # worker, PDF, page image, or image decode runs on this path.
+                result = dict(manifest=dict(layout_revision=None,pages=[]))
+                (folder/'score.mid').write_bytes(plan.midi_bytes)
                 job['phase'] = 'synthesizing'
                 config = dict(rate=1.,hand_mode='both',tracks=[dict(id=p['id'],muted=False,solo=False) for p in document.parts])
                 count = round((plan.duration_s+2)*self.audio.sample_rate)*8
@@ -191,7 +191,12 @@ class Controller(ScorePlayer):
             candidate = future.result()
             if job['done'] or job['cancel'].is_set() or job['generation'] != self.generation:
                 return
-            if candidate.get('confirmation'):
+            if job['kind'] == 'layout':
+                if job['snapshot'] is not self.active:
+                    raise InterruptedError('谱面已过期')
+                self.layout_candidates[job['job_id']] = candidate
+                job.update(phase='layout_ready')
+            elif candidate.get('confirmation'):
                 self.confirmations[job['job_id']] = candidate
                 job.update(phase='needs_confirmation',required=candidate['required'],source_sha256=candidate['source'].sha256,title=candidate['title'])
             else:
@@ -220,6 +225,7 @@ class Controller(ScorePlayer):
                 job['cancel'].set()
                 job.update(done=True,cancelled=True,phase='cancelled')
                 self.candidates.pop(job_id,None)
+                self.layout_candidates.pop(job_id,None)
                 self.confirmations.pop(job_id,None)
                 future=job.pop('future',None)
                 if future is not None:
@@ -249,8 +255,8 @@ class Controller(ScorePlayer):
                     pages=[dict(page=i,width=p['width'],height=p['height'],resource=f'score-{job_id}-{i}.png') for i,p in enumerate(manifest['pages'])])
 
     def get_score_page(self, layout_id, page, candidate_id=None):
-        c = self._candidate(candidate_id) if candidate_id else self.active
-        if not c or c['data']['manifest']['layout_revision'] != layout_id:
+        c = (self._layout_candidate(candidate_id) if candidate_id in self.layout_candidates else self._candidate(candidate_id)) if candidate_id else self.active
+        if not c or not layout_id or c['data']['manifest']['layout_revision'] != layout_id:
             raise ValueError('谱面版本已过期')
         page = int(page)
         pages = c['data']['manifest']['pages']
@@ -258,11 +264,81 @@ class Controller(ScorePlayer):
             raise ValueError('页码超出范围')
         return json_value(pages[page])
 
+    def _prepare_layout(self, snapshot, folder, cancelled):
+        source = snapshot['plan'].document.source
+        folder.mkdir(exist_ok=True)
+        input_path = folder / ('input' + Path(source.original_name).suffix.lower())
+        input_path.write_bytes(source.original_bytes)
+        request = dict(source_path=str(input_path),original_name=source.original_name,
+                       settings=snapshot['plan'].settings,source_revision=snapshot['plan'].document.revision)
+        (folder/'request.json').write_text(json.dumps(request,ensure_ascii=False))
+        result = run_preparation(folder,cancelled)
+        if result['source_sha256'] != source.sha256 or result['source_revision'] != request['source_revision'] or (folder/'score.mid').read_bytes() != snapshot['plan'].midi_bytes:
+            raise ValueError('谱面与当前来源／播放编译不一致')
+        return dict(data=result,folder=folder)
+
+    def begin_score_layout(self, source_revision):
+        if not self.active or self.plan.document.revision != source_revision:
+            raise ValueError('乐谱已过期')
+        if self.active['data']['manifest']['layout_revision']:
+            return dict(ready=True,**self._layout_descriptor(self.active,None))
+        if self.current_layout_job:
+            job=self.jobs.get(self.current_layout_job)
+            if job and not job['done'] and job['snapshot'] is self.active:
+                return dict(job_id=job['job_id'],ready=False)
+        snapshot=self.active
+        jid=uuid.uuid4().hex
+        folder=self.workspace/jid
+        cancel=threading.Event()
+        job=dict(job_id=jid,generation=self.generation,kind='layout',phase='engraving',done=False,
+                 cancelled=False,error=None,cancel=cancel,lock=threading.Lock(),folder=folder,snapshot=snapshot)
+        self.jobs[jid]=job
+        self.current_layout_job=jid
+        def check():
+            return cancel.is_set() or self.closed or snapshot is not self.active or job['generation']!=self.generation
+        def work():
+            with self._preparing(check):
+                return self._prepare_layout(snapshot,folder,check)
+        job['future']=self.pool.submit(work)
+        self._prune()
+        return dict(job_id=jid,ready=False)
+
+    def _layout_candidate(self, job_id):
+        self.get_job(job_id)
+        job=self.jobs[job_id]
+        if job['done'] or job_id not in self.layout_candidates or job['snapshot'] is not self.active or job['generation']!=self.generation:
+            raise ValueError('谱面候选已过期')
+        return self.layout_candidates[job_id]
+
+    def _layout_descriptor(self, candidate, candidate_id):
+        manifest=candidate['data']['manifest']
+        resource_id=candidate_id or candidate['layout_job_id']
+        return dict(candidate_id=candidate_id,source_revision=manifest['source_revision'],layout_revision=manifest['layout_revision'],
+                    pages=[dict(page=i,width=p['width'],height=p['height'],resource=f'score-{resource_id}-{i}.png') for i,p in enumerate(manifest['pages'])])
+
+    def get_layout_candidate(self, job_id):
+        return self._layout_descriptor(self._layout_candidate(job_id),job_id)
+
+    def publish_score_layout(self, job_id, source_revision, layout_revision):
+        candidate=self._layout_candidate(job_id)
+        manifest=candidate['data']['manifest']
+        if self.plan.document.revision!=source_revision or manifest['source_revision']!=source_revision or manifest['layout_revision']!=layout_revision:
+            raise ValueError('谱面来源已过期')
+        # Called only after all real page images decoded. Audio and playback
+        # revisions/clock are untouched by this independently atomic commit.
+        self.active.update(data=candidate['data'],layout_folder=candidate['folder'],layout_job_id=job_id)
+        self.jobs[job_id].update(done=True,phase='completed')
+        self.layout_candidates.pop(job_id)
+        return self.get_document()
+
     def resource(self, name):
-        for jid,c in list(self.candidates.items()) + ([(self.active['job_id'],self.active)] if self.active else []):
+        candidates=list(self.layout_candidates.items())
+        if self.active and self.active['data']['manifest']['layout_revision']:
+            candidates.append((self.active['layout_job_id'],self.active))
+        for jid,c in candidates:
             for i in range(len(c['data']['manifest']['pages'])):
                 if name == f'score-{jid}-{i}.png':
-                    return (c['folder']/f'page-{i+1}.png').read_bytes()
+                    return (c.get('layout_folder',c['folder'])/f'page-{i+1}.png').read_bytes()
         return None
 
     @serialized
@@ -310,17 +386,19 @@ class Controller(ScorePlayer):
                     voices=sorted({e.part_id+':'+e.voice_id for e in document.elements}),
                     occurrences=json_value(plan.occurrences),hand_status='confirmed' if self.hands else 'unassigned',
                     used_pitches=sorted({e.pitch for e in document.elements if e.pitch is not None}),
-                    pages=len(self.active['data']['manifest']['pages']),ready=True)
+                    pages=len(self.active['data']['manifest']['pages']),layout_ready=bool(self.active['data']['manifest']['layout_revision']),
+                    diagnostics_count=len(plan.diagnostics)+len(self.active['data']['manifest'].get('layout_diagnostics',[])),ready=True)
 
     def get_capabilities(self):
-        return dict(profile='V2-P0-1',formats=['musicxml','xml','mxl'],root='score-partwise',versions=['3.1','4.0'],
+        return dict(profile='V2-P0-2',formats=['musicxml','xml','mxl'],root='score-partwise',versions=['3.1','4.0'],
                     repeat='non-nested, first/second endings',midi_channels=15,ppqn_max=32767,
-                    unsupported=['grace','ornaments','nested-repeat','DC/DS/Fine/Coda','microtones','nonzero-transpose','unpitched'])
+                    ornaments=['arpeggiate: bounded 1/16-quarter spread','measured tremolo: single or same-bar paired note/chord'],
+                    unsupported=['grace','other-ornaments','unmeasured-or-cross-bar-tremolo','nested-repeat','DC/DS/Fine/Coda','microtones','nonzero-transpose','unpitched'])
 
     def get_diagnostics(self, cursor=0):
         if not self.plan:
             return dict(total=0,items=[],next_cursor=None)
-        items=self.plan.diagnostics
+        items=self.plan.diagnostics+self.active['data']['manifest'].get('layout_diagnostics',[])
         cursor=max(0,int(cursor))
         return dict(total=len(items),items=items[cursor:cursor+100],next_cursor=cursor+100 if cursor+100<len(items) else None)
 
@@ -518,7 +596,7 @@ class Controller(ScorePlayer):
             raise ValueError('导出目标已过期，请重新保存')
         snapshot=target['snapshot']
         source=snapshot['plan'].document.source
-        data=source.original_bytes if format=='source' else snapshot['plan'].midi_bytes if format=='midi' else (snapshot['folder']/'score.pdf').read_bytes()
+        data=source.original_bytes if format=='source' else snapshot['plan'].midi_bytes if format=='midi' else None
         jid=uuid.uuid4().hex
         job=dict(job_id=jid,generation=self.generation,kind='export',phase='writing',done=False,cancelled=False,error=None,
                  cancel=threading.Event(),lock=threading.Lock(),filename=target['path'].name)
@@ -526,14 +604,27 @@ class Controller(ScorePlayer):
         def work():
             temporary=None
             try:
+                payload=data
+                if format=='pdf':
+                    job['phase']='engraving'
+                    def cancelled():
+                        return job['cancel'].is_set() or self.closed
+                    # An export owns its immutable source snapshot even when
+                    # the active song changes. It never publishes UI geometry.
+                    with self._preparing(cancelled):
+                        folder=self.workspace/jid
+                        job['folder']=folder
+                        self._prepare_layout(snapshot,folder,cancelled)
+                        payload=(folder/'score.pdf').read_bytes()
+                    job['phase']='writing'
                 with tempfile.NamedTemporaryFile(prefix='.pianoscope-',dir=target['path'].parent,delete=False) as stream:
                     temporary=Path(stream.name)
-                    for offset in range(0,len(data),64*1024):
+                    for offset in range(0,len(payload),64*1024):
                         if job['cancel'].is_set() or self.closed:
                             raise InterruptedError('已取消')
-                        stream.write(data[offset:offset+64*1024])
+                        stream.write(payload[offset:offset+64*1024])
                     stream.flush();os.fsync(stream.fileno())
-                if hashlib.sha256(temporary.read_bytes()).digest()!=hashlib.sha256(data).digest():
+                if hashlib.sha256(temporary.read_bytes()).digest()!=hashlib.sha256(payload).digest():
                     raise OSError('导出文件校验不一致')
                 with job['lock']:
                     if job['cancel'].is_set() or self.closed:
@@ -594,7 +685,7 @@ class Controller(ScorePlayer):
             if job['done'] and 'future' not in job:
                 del self.jobs[jid]
                 folder=job.get('folder')
-                if folder and (not self.active or folder!=self.active['folder']):
+                if folder and (not self.active or folder not in (self.active['folder'],self.active.get('layout_folder'))):
                     shutil.rmtree(folder,ignore_errors=True)
 
     def close(self):
@@ -605,4 +696,4 @@ class Controller(ScorePlayer):
             self.cancel_job(jid)
         self.audio.close()
         self.pool.shutdown(wait=True,cancel_futures=True)
-        self.candidates.clear();self.confirmations.clear();self.active=None
+        self.candidates.clear();self.confirmations.clear();self.layout_candidates.clear();self.active=None

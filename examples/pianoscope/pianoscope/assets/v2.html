@@ -2,7 +2,7 @@
 <html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' file:; script-src 'self' file:; style-src 'self'; img-src 'self' file: data:; connect-src 'none'">
 <title>PianoScope</title><link rel="stylesheet" href="v2.css"></head>
-<body>
+<body class="roll-view">
 <button id="shade" aria-label="关闭侧栏" hidden></button>
 <aside id="sidebar" aria-label="曲目与设置">
   <div class="brand"><b><span class="brand-icon">▥</span> Piano<span>Scope</span></b><button id="closeSidebar" aria-label="关闭侧栏">×</button></div>
@@ -16,11 +16,11 @@
 </aside>
 <main>
   <div class="top"><button id="menu" aria-label="打开侧栏">☰</button><div class="song"><b id="title">PianoScope</b><small id="meta">看见音乐，认识琴键</small></div><div class="keytools"><div id="keyboardMode" class="segmented" role="radiogroup" aria-label="键盘范围" data-value="focused"><button id="full" type="button" role="radio" value="full">完整键盘</button><button id="focused" type="button" role="radio" value="focused">曲目键盘</button></div><label><input id="names" type="checkbox" checked>显示音名</label><button id="rollEffects" class="roll-effects" type="button" aria-pressed="true">触键光效</button><label class="lift-control">触键线上移 <input id="lift" type="range" min="0" max="60" value="0"><span id="liftText">0%</span></label></div></div>
-  <div class="tools"><div class="segmented views" role="radiogroup" aria-label="乐谱视图" data-value="sheet"><button id="sheetMode" type="button" role="radio" value="sheet">五线谱</button><button id="rollMode" type="button" role="radio" value="roll">下落音符</button></div><div class="score-tools"><button id="follow" aria-pressed="true">自动跟随</button><button id="current">回到当前</button><div id="zoom" class="segmented" role="radiogroup" aria-label="谱面缩放" data-value="1"><button type="button" role="radio" value="1">100%</button><button type="button" role="radio" value="1.25">125%</button><button type="button" role="radio" value="1.5">150%</button></div><button id="keyboardToggle">显示键盘</button></div><span id="visitText" class="muted"></span><div id="occurrence" class="segmented" role="radiogroup" aria-label="跳转遍次" hidden></div></div>
+  <div class="tools"><div class="segmented views" role="radiogroup" aria-label="乐谱视图" data-value="roll"><button id="sheetMode" type="button" role="radio" value="sheet">五线谱</button><button id="rollMode" type="button" role="radio" value="roll">下落音符</button></div><div class="score-tools" hidden><button id="follow" aria-pressed="true">自动跟随</button><button id="current">回到当前</button><div id="zoom" class="segmented" role="radiogroup" aria-label="谱面缩放" data-value="1"><button type="button" role="radio" value="1">100%</button><button type="button" role="radio" value="1.25">125%</button><button type="button" role="radio" value="1.5">150%</button></div><button id="keyboardToggle">显示键盘</button></div><span id="visitText" class="muted"></span><div id="occurrence" class="segmented" role="radiogroup" aria-label="跳转遍次" hidden></div></div>
   <div id="message" role="status" hidden></div><div id="loading" hidden><span id="loadLabel"></span><button id="cancelLoad">取消</button></div>
   <div class="music-scene">
-  <section id="workspace"><div id="sheet" tabindex="0" aria-label="五线谱"><div id="empty">打开乐谱后即可阅读、试听和慢练。<br><button id="emptyOpen">打开乐谱</button></div></div><div id="rollArea" hidden><canvas id="roll"></canvas><div id="strike"><span id="strikeLabel">现在 · 按下</span></div></div></section>
-  <div id="keyboard" hidden><div id="keys" aria-label="钢琴键盘"></div></div>
+  <section id="workspace"><div id="sheet" hidden tabindex="0" aria-label="五线谱"><div id="empty">打开乐谱后即可阅读、试听和慢练。<br><button id="emptyOpen">打开乐谱</button></div></div><div id="rollArea"><canvas id="roll"></canvas><div id="strike"><span id="strikeLabel">现在 · 按下</span></div></div></section>
+  <div id="keyboard"><div id="keys" aria-label="钢琴键盘"></div></div>
   <div class="current-row"><span class="muted">当前音符</span><div id="currentNotes"></div><span id="picked" class="muted">中央 C · C4</span><span class="pedal-legend">■ 按住　□ 延音</span></div>
   </div>
   <section class="transport-panel" aria-label="播放控制">

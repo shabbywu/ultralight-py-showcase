@@ -97,6 +97,8 @@ def main():
                             await click('#rate button[value="'+str(rate).replace('0.','.')+'"]' if rate!=1 else '#rate button[value="1"]')
                             await view.wait_until(lambda:c.config['rate']==rate,timeout=15)
                             check('segmented rate '+str(rate),c.audio.rate==rate)
+                        await click('#sheetMode')
+                        await view.wait_until(lambda:view.evaluate('App.rows.length>0&&!App.sheetRequest'),timeout=40)
                         await click('#zoom button[value="1.5"]');check('segmented zoom',view.evaluate('document.getElementById("zoom").value')=='1.5')
                         await click('#zoom button[value="1.25"]')
                         view.key_down(39);view.key_up(39);await asyncio.sleep(.08)
