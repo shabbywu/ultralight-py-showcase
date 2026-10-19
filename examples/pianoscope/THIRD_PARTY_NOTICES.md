@@ -32,6 +32,8 @@
 
 Python 包的原始许可随其发行包保留，具体依赖与哈希见 `uv.lock`。本项目未制作包含这些原生库的发行包。
 
+v2 安全 XML 读取显式声明既有传递依赖 defusedxml 0.7.1（PSF license；发行包自带 LICENSE），已在 CPython 3.10.20 原生环境验证外部 DOCTYPE 不取回、内部实体拒绝。v2 原创 MusicXML 夹具由 `tools/generate_v2_fixtures.py` 直接编写，采用本项目 MIT；不由 MIDI 转谱。v2 路线与验证记录独立见 `docs/V2_DECISIONS.md`、`docs/V2_VALIDATION.md`。
+
 ## v1.1 制谱与验证依赖
 
 | 组件 | 锁定版本／本机资源 | 许可与用途 |

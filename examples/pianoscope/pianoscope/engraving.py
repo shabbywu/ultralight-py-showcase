@@ -163,7 +163,7 @@ def geometry(svg):
     return dict(width=width,height=height,systems=systems,measures=measures,glyphs=glyphs)
 
 
-def engrave(xml, title, directory, cancelled=lambda:False, caption=None):
+def engrave(xml, title, directory, cancelled=lambda:False, caption=None, layout_options=None):
     import verovio
     cairo = cairo_module()
     directory = Path(directory); directory.mkdir(parents=True,exist_ok=True)
@@ -171,6 +171,8 @@ def engrave(xml, title, directory, cancelled=lambda:False, caption=None):
     toolkit.setOptions(dict(svgBoundingBoxes=True,svgViewBox=True,
         pageWidth=2100,pageHeight=2970,pageMarginTop=180,pageMarginBottom=220 if caption else 120,
         pageMarginLeft=100,pageMarginRight=100,scale=40,header='none',footer='none'))
+    if layout_options:
+        toolkit.setOptions(layout_options)
     if not toolkit.loadData(xml):
         raise ValueError('原生排版失败：'+toolkit.getLog())
     count = toolkit.getPageCount()
