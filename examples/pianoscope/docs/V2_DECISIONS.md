@@ -19,3 +19,14 @@ G0 保留原建议预算：XML/MXL 10 MiB、容器总解压 32 MiB／256 项／�
 G0 证据见 [v2 验收](V2_VALIDATION.md)。所有历史人工／性能未测项保持原状态；不把 G0、截图或候选接口记作完整发布通过。P2 仅规划。
 
 偏移规则按 [MusicXML offset 规范](https://www.w3.org/2021/06/musicxml40/musicxml-reference/elements/offset/) 实现：direction/offset 默认仅显示，sound="yes" 才影响播放；sound 的子 offset 覆盖 direction。早期夹具错误已更正并重新执行 G0，旧报告不作最终证明。SourceDocument 的内容身份保持确定；会话发布 revision 另含加载身份，防止相同文件重载后混用旧确认或资源。
+
+
+2026-10-19 用户反馈变更：默认下落视图与 profile V2-P0-2
+
+按用户要求覆盖原规格“默认五线谱／排版后才能就绪”的加载顺序。候选源语义、MIDI 和 PCM 保持一起原子发布；五线谱改为独立、绑定 source revision 的按需作业，全部真实页图解码后才提交布局，取消、失败或迟到结果不得改变当前 PCM／DAC epoch。尚未排版时 `layout_revision=null`、`layout_ready=false`，不宣称已有符头几何；PDF 导出独立按原源快照排版，源副本及 MIDI 不等待排版。无新增依赖，继续同一 SoundFont 播放器。
+
+profile V2-P0-2 新增琶音及定量单音／同小节成对音／和弦震音的真实事件编译。琶音分组／默认方向来自 [MusicXML arpeggiate](https://www.w3.org/2021/06/musicxml40/musicxml-reference/elements/arpeggiate/)，间隔采用项目明确策略（1/16 四分音符，短音收窄、原 release 不延长）；规范没有指定演奏展开时间。震音按 [MusicXML tremolo](https://www.w3.org/2021/06/musicxml40/musicxml-reference/elements/tremolo/) 使用划数／原 type 附加符尾确定细分，并以原 duration 限定总时长，2:1 不重复缩放。自由／跨小节／歧义或与 tie 等组合继续拒绝，换气仅显示并诊断。同谱表同位置连续速度命令采用源顺序最后值并诊断，跨谱表矛盾仍拒绝。
+
+个人曲目的编码分页实测可越过固定 A4 页底。排版器先以真实原生几何预检，超界时只对派生谱面进行一次自动重新分页，再按原严格符头／休止／ID／打印边界校验；不裁切，不删除音符，不改原字节。页数、内存、产物、超时预算保持。
+
+新证据、失败尝试及未测限制另记 [默认下落／兼容验收](V2_LOADING_VALIDATION.md)。原 G0／M5 结果与 v1.1 历史保持原记录，不据此回填新的完整发布矩阵。
