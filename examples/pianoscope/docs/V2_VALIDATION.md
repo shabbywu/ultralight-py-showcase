@@ -1,5 +1,7 @@
 # PianoScope v2 独立验收
 
+后续界面修正另见 [UI 反馈回归](V2_UI_FEEDBACK.md)；下文主体是首次 M5 交付快照，旧性能不自动转记给后续 UI。
+
 2026-10-19，分支 `codex/pianoscope-v2`，v1.1 基线 `757443f2fbf031d09b671606e7e81320dd3b6009`。G0 后依次完成 M1 来源模型、M2 播放编译、M3 阅读跟谱、M4 事务和 M5 入口迁移／交付。正式 `run.py` 已切换 v2；历史验收文件及 Git 历史未改写，不自动 push。这里仅给实际执行的范围签入结果；下列 not_run 子项仍未完成，不声称全部人工与极限组合验收通过。
 
 参考机为 Apple M1 / MacBookAir10,1（硬件型号由本机 sysctl 读取），环境为 macOS 27.0.1 ARM64、CPython 3.10.20、ultralight-py 0.5.0、Verovio 5.6.0（原生 5.6.0-85e7620）、CairoSVG 2.8.2、pypdf 6.12.2、fonttools 4.63.0、psutil 7.2.2、defusedxml 0.7.1、Mido 1.3.3、NumPy 2.2.6、sounddevice 0.5.6、Cocoa 12.2.2；原生 FluidSynth 2.6.1、PortAudio 19.7.0、Cairo 1.18.4。独立验证为 music21 9.9.1／PyMuPDF 1.27.2.3。Python 精确依赖及哈希在 `uv.lock`；[本机安装冻结](../../../.tmp/pianoscope/v2/m5-environment-freeze.txt)不代表其他 Python／平台通过。
@@ -9,7 +11,7 @@
 | 证据代号 | 实际结果 |
 | --- | --- |
 | U | [M5 全套 80 passed](../../../.tmp/pianoscope/v2/m5-unit-matrix.xml)，一次完整矩阵，含源、编译、真实 worker／离线 SoundFont 与原 DAC 回归；ZIP 重复名称警告来自故意构造的坏输入 |
-| B | [边界／保存取消 20 passed](../../../.tmp/pianoscope/v2/m5-boundary-export-supplement.xml)：含既有 profile 的定向回归；另 [真实 worker 确定性／33 页 1 passed](../../../.tmp/pianoscope/v2/m5-worker-determinism-pages.xml)，[诊断位置 30 passed](../../../.tmp/pianoscope/v2/m5-diagnostic-location.xml)。这些是后续定向结果，不能与 U 简单相加为独立用例总数；当前源码共 89 个参数展开用例 |
+| B | [边界／保存取消 20 passed](../../../.tmp/pianoscope/v2/m5-boundary-export-supplement.xml)：含既有 profile 的定向回归；另 [真实 worker 确定性／33 页 1 passed](../../../.tmp/pianoscope/v2/m5-worker-determinism-pages.xml)，[诊断位置 30 passed](../../../.tmp/pianoscope/v2/m5-diagnostic-location.xml)。这些是后续定向结果，不能与 U 简单相加为独立用例总数；该次交付共 89 个参数展开用例 |
 | C | [800×600 CPU，47 passed](../../../.tmp/pianoscope/v2/m5-cpu-800-attempt-1.json)：实际 AppCore／API／Canvas／音频，断网沙箱，60 秒最低 30 FPS |
 | G | [1440×900 GPU，47 passed](../../../.tmp/pianoscope/v2/m5-gpu-1440-attempt-1.json)：实际 AppCore／音频，断网沙箱，60 秒最低 45 FPS |
 | N | [最终遍次／UI 补充 51 passed](../../../.tmp/pianoscope/v2/m5-occurrence-ui-supplement.json)：真实原生休止、小节、tie 后段、第二遍 binding；A/B 遍次文字、默认小屏折叠及触键线持久化 |
