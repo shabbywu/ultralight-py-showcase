@@ -3,8 +3,8 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 [project]
 name = "pianoscope"
-version = "1.1.0"
-description = "原生 MIDI 钢琴播放器"
+version = "2.0.0"
+description = "MusicXML 驱动的原生钢琴阅读与练习播放器"
 requires-python = ">=3.10"
 dependencies = ["ultralight-py==0.5.0", "numpy==2.2.6", "mido==1.3.3", "sounddevice==0.5.6", "verovio==5.6.0", "CairoSVG==2.8.2", "pypdf==6.12.2", "fonttools==4.63.0", "psutil==7.2.2", "defusedxml==0.7.1", "pyobjc-framework-Cocoa==12.2.2; sys_platform == 'darwin'"]
 [project.optional-dependencies]
@@ -14,5 +14,6 @@ pianoscope = ["assets/*", "resources/demos/*", "resources/soundfonts/*", "resour
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 cache_dir = "../../.tmp/pianoscope/pytest-cache"
+addopts = "--basetemp=../../.tmp/pianoscope/pytest-tmp"
 [tool.setuptools.packages.find]
 include = ["pianoscope*"]

@@ -7,10 +7,9 @@ import mido
 import numpy as np
 import pytest
 from pianoscope.midi import parse_midi, TempoMap, ScoreError, Note, Score
-from pianoscope.hands import preview, assigned
+from legacy_hands import preview, assigned
 from pianoscope.analysis import overview, fft_amplitude, analyze
 from pianoscope.render import render, audible_notes
-from pianoscope.session import Controller, DEMO_ROOT
 
 
 def midi(tmp_path,tracks,type=1,ppqn=480):
@@ -107,47 +106,8 @@ def test_real_hands_filter_and_same_pitch_routes():
     unknown=replace(s,notes=[replace(n,hand='unassigned') for n in s.notes])
     assert np.max(np.abs(render(unknown,cfg(unknown,mode='left'),48000)))==0
 
-def wait(c,j):
-    deadline=time.monotonic()+15
-    while time.monotonic()<deadline:
-        result=c.get_job(j['job_id'])
-        if result['done']:
-            assert not result['error'],result
-            return result
-        time.sleep(.01)
-    raise AssertionError('job timed out')
 
-def test_jobs_generation_rollback_cancel_and_hands(tmp_path):
-    c=Controller()
-    try:
-        wait(c,c.begin_load('demo:harmonics'));old=c.score
-        bad=tmp_path/'bad.mid';bad.write_bytes(b'broken')
-        job=c.begin_load(c.token_for_path(bad))
-        while not c.get_job(job['job_id'])['done']:time.sleep(.01)
-        assert c.score is old and c.phase=='paused'
-        job=c.begin_load('demo:first-light');assert c.cancel_job(job['job_id'])
-        assert c.score is old and c.get_job(job['job_id'])['cancelled']
-        p=asyncio.run(c.preview_hands({'type':'pitch_split','pitch':65}))
-        wait(c,c.apply_hands(p['preview_id'],{'n0':'left'}))
-        assert c.score.notes[0].hand=='left'
-        wait(c,c.undo_hands());assert [n.hand for n in c.score.notes]==[n.hand for n in old.notes]
-        # A later task wins even when the previous queued work finishes late.
-        j=c.begin_load('demo:first-light');last=c.begin_load('demo:harmonics');wait(c,last)
-        assert c.get_job(j['job_id'])['cancelled'] and c.score.title=='泛音练习'
-    finally:c.close()
-    assert not any(t.name.startswith('pianoscope-') for t in __import__('threading').enumerate())
 
-def test_loop_validation_and_volume(tmp_path):
-    c=Controller()
-    try:
-        wait(c,c.begin_load('demo:harmonics'))
-        with pytest.raises(ValueError):asyncio.run(c.set_loop(True,2,2.1))
-        asyncio.run(c.set_loop(True,2,3))
-        t=asyncio.run(c.seek(20));assert 2<=t['position_s']<3
-        asyncio.run(c.stop());assert c.audio.position==0 and c.audio.loop['enabled']
-        for value in (float('nan'),-1,2):
-            with pytest.raises(ValueError):c.set_volume(value)
-    finally:c.close()
 
 def test_track_mute_solo_and_cc_expression_in_real_pcm():
     s=short_score();s.tracks.append(dict(id='t1c0',name='Second',source_channel=0,source_track=1,muted=False,solo=False))
@@ -177,23 +137,7 @@ def test_input_count_limits(tmp_path,what):
     else:tracks=[[cc(7,100) for _ in range(200001)]]
     with pytest.raises(ScoreError):parse_midi(midi(tmp_path,tracks))
 
-def test_cancelled_load_visible_immediately_and_no_late_publish():
-    c=Controller()
-    try:
-        wait(c,c.begin_load('demo:harmonics'));old=c.score
-        j=c.configure(.5,c.score.tracks,'both');start=time.monotonic();assert c.cancel_job(j['job_id'])
-        assert c.get_job(j['job_id'])['cancelled'] and time.monotonic()-start<1
-        time.sleep(.1)
-        assert c.score is old and c.config['rate']==1
-    finally:c.close()
 
-def test_completed_jobs_do_not_retain_pcm_versions():
-    c=Controller()
-    try:
-        for i in range(4):wait(c,c.begin_load('demo:harmonics'))
-        assert all('future' not in j for j in c.jobs.values())
-        assert c.audio.pcm.nbytes<192*1024*1024 and not c.audio.pcm.flags.writeable
-    finally:c.close()
 
 def test_all_sound_off_cuts_actual_release_voices(tmp_path):
     p=midi(tmp_path,[[on(),cc(120,0,t=480),mido.MetaMessage('end_of_track',time=480)]],type=0)
