@@ -1,6 +1,6 @@
 # 默认下落视图与 MusicXML 表现记号回归
 
-2026-10-19，按用户反馈修正 `Forbidden Colours.mxl` 的导入阻断，并将首次打开改为下落音符。保留 Python 3.10.20、ultralight-py 0.5.0、AppCore、Canvas 2D、`API("piano")`、原 SoundFont／FluidSynth／PortAudio 与设备 DAC 时钟，没有新增运行依赖。原 G0、M5 和 v1.1 验收不改写。
+2026-10-19，按用户反馈修正 `Forbidden Colours.mxl` 的导入阻断，并将首次打开改为下落音符。保留 Python 3.10.20、ultralight-py 0.5.0、AppCore、Canvas 2D、`API("piano")`、原 SoundFont／FluidSynth／PortAudio 与设备 DAC 时钟，没有新增运行依赖。原 G0、M5 和 v1.1 验收不改写。后续手别分配的缓冲复用及 512 MiB 预算见[独立修正记录](V2_HANDS_MEMORY_VALIDATION.md)；本页末尾的 192 MiB 限制保留为当时状态。
 
 这次明确修改原规格的就绪条件：源语义、真实 MIDI、实例、PCM 一起提交后即可使用下落视图；此时没有排版作业、PNG、PDF 或底图解码，`layout_ready=false`、`layout_revision=null`。点击“五线谱”才启动绑定源版本的隔离排版作业，全部真实页图解码后单独原子发布布局。视图切换不重建播放器、不改变 PCM、倍率、循环或 DAC epoch。取消、过期、坏页图不会提交部分谱面，也不会撤销已可用的当前曲声音；可以回到下落音符或重新排版。源副本／MIDI 导出不等待排版，PDF 导出按已选快照独立排版。
 
