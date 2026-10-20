@@ -2,54 +2,129 @@
   {
     "id": "emberkeep",
     "title": "Emberkeep",
-    "status": "已实现",
-    "kind": "桌面游戏 / submodule",
-    "description": "提着灯笼探索地牢。Python 驱动回合规则、战斗与存档，Canvas 和 Alpine.js 呈现像素世界。",
-    "features": [
-      "实时对象代理",
-      "asyncio / Promise",
-      "Canvas + Alpine.js"
-    ],
+    "kind": {
+      "zh-CN": "像素地牢 / 桌面游戏",
+      "en": "Pixel dungeon / Game"
+    },
+    "description": {
+      "zh-CN": "提起灯笼，走进由 Python 驱动的像素地牢。回合规则、战斗与存档来自 Python，像素世界由 Canvas 呈现。",
+      "en": "Pick up a lantern. Explore a dungeon powered by Python, with turn-based combat and saves behind a Canvas interface."
+    },
+    "features": {
+      "zh-CN": [
+        "Canvas",
+        "Python 对象",
+        "异步交互"
+      ],
+      "en": [
+        "Canvas",
+        "Python objects",
+        "Async interop"
+      ]
+    },
     "source": "https://github.com/shabbywu/emberkeep",
-    "image": "assets/emberkeep.png",
     "guide": "https://github.com/shabbywu/emberkeep#run",
     "releases": "https://github.com/shabbywu/emberkeep/releases",
-    "image_alt": "Emberkeep 原生运行截图：像素地牢与游戏状态界面"
-  },
-  {
-    "id": "bridge-lab",
-    "title": "Ultralight Bridge Lab",
-    "status": "P0 已实现",
-    "kind": "交互式桥接实验室 / AppCore",
-    "description": "六个案例均可同时编辑 Python 与 JavaScript，在原生桌面窗口中运行。支持普通 Python 导入、函数、类和异步代码，真实探索函数调用、Promise、对象与容器代理、异常和快照。",
-    "features": [
-      "六个双端可编辑案例",
-      "Python 导入 / 函数 / 类 / asyncio",
-      "Console / Inspector",
-      "原生 GPU / CPU 冒烟通过"
-    ],
-    "source": "https://github.com/shabbywu/ultralight-py-showcase/tree/main/examples/bridge-lab",
-    "source_label": "查看源码",
-    "image": "assets/bridge-lab.png",
-    "image_alt": "Bridge Lab 原生截图：六个案例均支持 Python 与 JavaScript 双端编辑，控制台展示真实桥接结果",
-    "guide": "https://github.com/shabbywu/ultralight-py-showcase/tree/main/examples/bridge-lab#readme"
+    "animation": "assets/emberkeep-demo.webp",
+    "poster": "assets/emberkeep-poster.png",
+    "image": "assets/emberkeep.png",
+    "image_alt": {
+      "zh-CN": "Emberkeep 原生运行截图：像素地牢、提灯旅人和右侧角色状态",
+      "en": "Emberkeep native window showing a pixel dungeon, lantern-bearing hero, and character stats"
+    },
+    "animation_alt": {
+      "zh-CN": "Emberkeep 真实原生录制：探索地牢、移动与战斗",
+      "en": "Real Emberkeep recording: dungeon exploration, movement, and combat"
+    },
+    "license": "assets/emberkeep-LICENSE.txt",
+    "license_label": {
+      "zh-CN": "原创游戏与展示图 · MIT",
+      "en": "Original game & demo images · MIT"
+    }
   },
   {
     "id": "pianoscope",
     "title": "PianoScope",
-    "status": "可运行 · 部分人工验收待完成",
-    "kind": "钢琴播放器与练习谱 / AppCore",
-    "description": "看见音乐，认识琴键。真实钢琴音源播放 MIDI，支持文件夹曲库、左右手设置、慢放循环和声音分析。可生成双谱表练习谱，预览后应用，跟随原曲高亮并导出 PDF／MusicXML。",
-    "features": [
-      "真实 SoundFont 钢琴",
-      "双谱表量化 / 自动调号与谱号",
-      "原曲时钟跟谱 / 慢放循环",
-      "可打印 PDF / 可编辑 MusicXML"
-    ],
+    "kind": {
+      "zh-CN": "音乐可视化 / 钢琴练习",
+      "en": "Music / Piano practice"
+    },
+    "description": {
+      "zh-CN": "从 MusicXML 出发，听见音乐，也看见每一次触键。下落音符与五线谱共同跟随真实钢琴声音，支持慢练与片段循环。",
+      "en": "From MusicXML to sound. See every keystroke in falling notes or sheet music, with SoundFont piano playback, slower practice, and loops."
+    },
+    "features": {
+      "zh-CN": [
+        "MusicXML",
+        "SoundFont",
+        "Canvas 2D"
+      ],
+      "en": [
+        "MusicXML",
+        "SoundFont",
+        "Canvas 2D"
+      ]
+    },
     "source": "https://github.com/shabbywu/ultralight-py-showcase/tree/main/examples/pianoscope",
-    "source_label": "查看源码",
+    "guide": "https://github.com/shabbywu/ultralight-py-showcase/tree/main/examples/pianoscope#readme",
+    "animation": "assets/pianoscope-demo.webp",
+    "poster": "assets/pianoscope-poster.png",
     "image": "assets/pianoscope.png",
-    "image_alt": "PianoScope 原生 AppCore 截图：实际钢琴音源播放初光，左手薄荷绿、右手暖金，键盘下方显示真实声音波形与频谱",
-    "guide": "https://github.com/shabbywu/ultralight-py-showcase/tree/main/examples/pianoscope#readme"
+    "image_alt": {
+      "zh-CN": "PianoScope 原生运行截图：原创 MusicXML 初光的双谱表与钢琴键盘",
+      "en": "PianoScope native window showing the original First Light MusicXML score on a grand staff, with a piano keyboard"
+    },
+    "animation_alt": {
+      "zh-CN": "PianoScope 真实原生录制：初光的下落音符、持续触键尾迹和设备时钟播放",
+      "en": "Real PianoScope recording: First Light falling notes, sustained key trails, and device-clock playback"
+    },
+    "license": "assets/pianoscope-LICENSE.txt",
+    "license_label": {
+      "zh-CN": "原创乐谱与展示图 · MIT",
+      "en": "Original score & demo images · MIT"
+    },
+    "notice": "assets/pianoscope-NOTICE.md"
+  },
+  {
+    "id": "bridge-lab",
+    "title": "Bridge Lab",
+    "kind": {
+      "zh-CN": "双端编辑 / 桥接实验室",
+      "en": "Python × JavaScript / Bridge lab"
+    },
+    "description": {
+      "zh-CN": "修改 Python 与 JavaScript，让桥接过程清晰可见。六个可编辑案例展示函数、异步 Promise、实时对象和容器、异常及快照。",
+      "en": "Edit both sides. See Python and JavaScript work together through six editable examples covering functions, promises, live proxies, errors, and snapshots."
+    },
+    "features": {
+      "zh-CN": [
+        "实时对象代理",
+        "Promise",
+        "Console"
+      ],
+      "en": [
+        "Live object proxies",
+        "Promise",
+        "Console"
+      ]
+    },
+    "source": "https://github.com/shabbywu/ultralight-py-showcase/tree/main/examples/bridge-lab",
+    "guide": "https://github.com/shabbywu/ultralight-py-showcase/tree/main/examples/bridge-lab#readme",
+    "animation": "assets/bridge-lab-demo.webp",
+    "poster": "assets/bridge-lab-poster.png",
+    "image": "assets/bridge-lab.png",
+    "image_alt": {
+      "zh-CN": "Bridge Lab 原生运行截图：可编辑的 Python 与 JavaScript、真实运行结果及状态检查器",
+      "en": "Bridge Lab native window with editable Python and JavaScript, real execution results, and the state inspector"
+    },
+    "animation_alt": {
+      "zh-CN": "Bridge Lab 真实原生录制：运行编辑后的函数、对象代理与异步 Promise",
+      "en": "Real Bridge Lab recording: edited functions, object proxies, and asynchronous promises"
+    },
+    "license": "assets/bridge-lab-NOTICE.md",
+    "license_label": {
+      "zh-CN": "来源与使用说明",
+      "en": "Source & usage notes"
+    }
   }
 ]
