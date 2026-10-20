@@ -33,3 +33,9 @@ def test_functions():
     with pytest.raises(ZeroDivisionError):
         divide(1,0)
     assert get_profile() == {'name':'Bridge Lab','version':'1.0','tags':['python','js']}
+
+
+def test_shared_arguments():
+    items, options = [], {"enabled": False}
+    assert Counter().share(items, options) is items
+    assert items == [7] and options["enabled"] is True
