@@ -12,11 +12,11 @@
 
 ## 曲目、截图与字体
 
-v1.1 历史 MIDI 演示及测试夹具由原 generate_demos.py／generate_fixtures.py 生成，源码在基线 757443f 可查，原创编排采用 MIT；相关 MIDI 产品入口和 hands sidecar 已退役。v2 的“初光”和“回环与晨光”由 [generate_v2_fixtures.py](tools/generate_v2_fixtures.py) 直接编写 MusicXML；指法与连奏符号夹具，以及“连奏与再起音 · 下落练习”（tests/fixtures/v2/roll-articulation.musicxml），均为本项目直接创作的 XML。原创乐谱、对应 PDF／MIDI／映射与截图沿用 MIT，未使用个人或未授权曲目。
+本项目的原创乐谱、MIDI 测试夹具及其派生 PDF／MIDI 和界面截图采用本项目 MIT 许可，个人乐谱不随仓库分发。内置“初光”和“回环与晨光”由 [generate_v2_fixtures.py](tools/generate_v2_fixtures.py) 直接编写 MusicXML；其他 XML 测试夹具同样为直接创作的源乐谱。
 
-`docs/screenshots/` 中选定的正式截图来自真实 AppCore CPU View，使用本项目原创曲与随包音源生成的实际概览；未使用生成式图片。其他验证截图保存在本地 `.tmp/pianoscope/validation/screenshots/`；AI 设计参考位于 `.tmp/pianoscope/reference/design/`，不作为运行截图或产品资源提交。
+`docs/screenshots/` 中的正式图片来自真实 AppCore CPU View，使用本项目原创曲与随包音源，未使用生成式图片。
 
-产品界面使用系统无衬线字体（macOS 为 PingFang SC）。v1.1／v2 谱面与 PDF 使用随包 Noto Sans CJK SC Regular（OFL-1.1）与 Verovio 随 wheel 提供的 Leipzig 音乐字形（OFL-1.1）；生成时转换为路径，不依赖用户机器字体或联网。
+产品界面使用系统无衬线字体（macOS 为 PingFang SC）。五线谱与 PDF 使用随包 Noto Sans CJK SC Regular（OFL-1.1）与 Verovio 随 wheel 提供的 Leipzig 音乐字形（OFL-1.1）；生成时转换为路径，不依赖用户机器字体或联网。
 
 ## 运行依赖
 
@@ -32,9 +32,9 @@ v1.1 历史 MIDI 演示及测试夹具由原 generate_demos.py／generate_fixtur
 
 Python 包的原始许可随其发行包保留，具体依赖与哈希见 `uv.lock`。本项目未制作包含这些原生库的发行包。
 
-v2 安全 XML 读取显式声明既有传递依赖 defusedxml 0.7.1（PSF license；[随附全文](docs/licenses/defusedxml-LICENSE)），已在 CPython 3.10.20 原生环境验证外部 DOCTYPE 不取回、内部实体拒绝。v2 原创 MusicXML 夹具由 `tools/generate_v2_fixtures.py` 直接编写，采用本项目 MIT；不由 MIDI 转谱。v2 路线与验证记录独立见 `docs/V2_DECISIONS.md`、`docs/V2_VALIDATION.md`。
+安全 XML 读取使用 defusedxml 0.7.1（PSF license；[随附全文](docs/licenses/defusedxml-LICENSE)）。
 
-## v1.1 制谱与验证依赖
+## 乐谱排版与测试依赖
 
 | 组件 | 锁定版本／本机资源 | 许可与用途 |
 | --- | --- | --- |
@@ -49,13 +49,9 @@ v2 安全 XML 读取显式声明既有传递依赖 defusedxml 0.7.1（PSF licens
 | Noto Sans CJK SC Regular | 16,437,364 bytes，随包 `pianoscope/resources/fonts/NotoSansCJKsc-Regular.otf` | [OFL-1.1 全文](pianoscope/resources/fonts/OFL.txt)，[上游原始字体](https://github.com/notofonts/noto-cjk/tree/main/Sans/OTF/SimplifiedChinese)；未修改，SHA-256 `2c76254f6fc379fddfce0a7e84fb5385bb135d3e399294f6eeb6680d0365b74b` |
 | music21（仅 test extra） | 9.9.1 | BSD-3-Clause；[全文](docs/licenses/music21-LICENSE)，独立读写 MusicXML，不承担产品记谱 |
 | PyMuPDF（仅 test extra） | 1.27.2.3 | AGPL-3.0 / 商业双许可；[全文](docs/licenses/pymupdf-COPYING)，验证时 PDF 渲染；产品运行不导入／分发此库 |
-| MuseScore Studio（v1.1 历史外部验证工具，v2 未运行） | 4.6.5.253511702；只读挂载官方 DMG | [GPL-3.0](https://github.com/musescore/MuseScore)；只用于导入、独立渲染和另存可编辑 MSCZ，应用不调用、不捆绑、不要求用户安装 |
 
-精确 Python 包及传递依赖、wheel URL 和 SHA-256 由 `uv.lock` 固定；本机安装体积、许可文件和平台记录见 [依赖清单](../../.tmp/pianoscope/validation/reports/v11-dependencies.json)。Verovio 安装约 16.0 MiB、CairoSVG 0.15 MiB、pypdf 1.41 MiB、fonttools 12.0 MiB、psutil 0.45 MiB；不含传递依赖、Cairo 与既有音频库。music21 和 PyMuPDF 验证环境约另加 77／51 MiB，不是常规运行依赖。所有音乐字形、中文字体和音源在安装后本地可用，无运行时下载。
+精确 Python 包及传递依赖、wheel URL 和 SHA-256 由 `uv.lock` 固定。music21 和 PyMuPDF 仅用于测试，不参与产品播放。所有音乐字形、中文字体和音源在安装后本地可用，无运行时下载。
 
-v2 的 `score_process.py`／`v2_worker.py` 用独立 Python 子进程运行 Verovio／CairoSVG，避免字体／原生库状态影响 AppCore 和音频回调。macOS Cairo 的库定位只在该子进程中临时补充 Homebrew 路径，不修改主进程动态库搜索。SVG 中的文字全部转换为本地字体路径，避免 CairoSVG 忽略网页字体导致的速度音符缺字；相同 SVG 输出 Canvas 底图和黑白 PDF。多页 PDF 用 pypdf 合并，实测页面为 595.2756 × 841.8898 pt（A4）。
+`score_process.py`／`v2_worker.py` 用独立 Python 子进程运行 Verovio／CairoSVG，避免字体／原生库状态影响 AppCore 和音频回调。macOS Cairo 的库定位只在该子进程中临时补充 Homebrew 路径，不修改主进程动态库搜索。SVG 中的文字全部转换为本地字体路径，避免 CairoSVG 忽略网页字体导致的速度音符缺字；相同 SVG 输出 Canvas 底图和黑白 PDF。多页 PDF 用 pypdf 合并，实测页面为 595.2756 × 841.8898 pt（A4）。
 
 新增源码和原创验证 MIDI 继续采用本目录 MIT；各依赖保留其自己的许可。未制作发行包。
-
-
-历史 v1.1 的自动调号建议采用 Krumhansl–Kessler 大／小调音级权重及相关性计算，以所选轨道的音长加权；权重说明见 [music21 官方文档](https://music21.org/music21docs/moduleReference/moduleAnalysisDiscrete.html)。该旧算法已退出 v2 生产路径，music21 继续仅用于独立验证。MusicXML 八度方向采用 [W3C octave-shift 契约](https://www.w3.org/2021/06/musicxml40/musicxml-reference/elements/octave-shift/)，音符数据保留实际音高。未增加运行依赖。
