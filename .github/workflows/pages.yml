@@ -17,7 +17,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Build and validate local links
+      - name: Test bilingual content and demo validation
+        run: python -m unittest discover -s scripts -p 'test_*.py' -v
+      - name: Build and validate locales, demos and local links
         run: python scripts/build_site.py
       - uses: actions/upload-pages-artifact@v3
         with:

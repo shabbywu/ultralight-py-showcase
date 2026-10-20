@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="4.0">
+  <work><work-title>指法与连奏 · 原创符号练习</work-title></work>
+  <identification><creator type="composer">PianoScope</creator><rights>MIT</rights></identification>
+  <part-list><score-part id="P"><part-name>钢琴</part-name></score-part></part-list>
+  <part id="P"><measure id="symbols" number="1">
+    <attributes><divisions>12</divisions><key><fifths>0</fifths></key><time><beats>4</beats><beat-type>4</beat-type></time><staves>2</staves><clef number="1"><sign>G</sign><line>2</line></clef><clef number="2"><sign>F</sign><line>4</line></clef></attributes>
+    <sound tempo="120"/>
+    <direction><direction-type><dynamics><mp/></dynamics></direction-type></direction>
+    <direction><direction-type><wedge type="crescendo" number="1"/></direction-type></direction>
+    <note id="s1" dynamics="50"><pitch><step>C</step><octave>4</octave></pitch><duration>6</duration><voice>1</voice><type>eighth</type><staff>1</staff><beam number="1">begin</beam><notations><slur type="start" number="1"/><articulations><staccato/><accent/></articulations><technical><fingering>1</fingering></technical></notations></note>
+    <note id="s2"><pitch><step>D</step><octave>4</octave></pitch><duration>6</duration><voice>1</voice><type>eighth</type><staff>1</staff><beam number="1">continue</beam></note>
+    <note id="s3"><pitch><step>E</step><octave>4</octave></pitch><duration>6</duration><voice>1</voice><type>eighth</type><staff>1</staff><beam number="1">continue</beam></note>
+    <note id="s4"><pitch><step>F</step><octave>4</octave></pitch><duration>6</duration><voice>1</voice><type>eighth</type><staff>1</staff><beam number="1">end</beam></note>
+    <direction><direction-type><words>rit.</words></direction-type></direction>
+    <note id="s5"><pitch><step>G</step><octave>4</octave></pitch><duration>6</duration><voice>1</voice><type>eighth</type><staff>1</staff><beam number="1">begin</beam></note>
+    <note id="s6"><pitch><step>A</step><octave>4</octave></pitch><duration>6</duration><voice>1</voice><type>eighth</type><staff>1</staff><beam number="1">continue</beam></note>
+    <note id="s7"><pitch><step>B</step><octave>4</octave></pitch><duration>6</duration><voice>1</voice><type>eighth</type><staff>1</staff><beam number="1">continue</beam></note>
+    <note id="s8"><pitch><step>C</step><octave>5</octave></pitch><duration>6</duration><voice>1</voice><type>eighth</type><staff>1</staff><beam number="1">end</beam><notations><fermata/><slur type="stop" number="1"/></notations></note>
+    <direction><direction-type><wedge type="stop" number="1"/></direction-type></direction>
+    <backup><duration>48</duration></backup>
+    <note id="s-bass"><pitch><step>C</step><octave>3</octave></pitch><duration>48</duration><voice>2</voice><type>whole</type><staff>2</staff></note>
+  </measure></part>
+</score-partwise>

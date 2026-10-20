@@ -1,26 +1,66 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="{{LANG}}" data-locale="{{LANG}}" data-entry="{{ENTRY}}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="ultralight-py 示例集：探索 Python 逻辑、JavaScript 界面与原生桌面的结合。">
-  <title>ultralight-py · Showcase</title>
-  <link rel="stylesheet" href="assets/style.css">
+  <meta name="color-scheme" content="dark">
+  <meta name="description" content="{{page_description}}">
+  <meta property="og:title" content="{{page_title}}">
+  <meta property="og:description" content="{{page_description}}">
+  <meta property="og:type" content="website">
+  <title>{{page_title}}</title>
+  <link rel="alternate" hreflang="zh-CN" href="{{PREFIX}}zh-CN/">
+  <link rel="alternate" hreflang="en" href="{{PREFIX}}en/">
+  <link rel="alternate" hreflang="x-default" href="{{PREFIX}}">
+  <link rel="icon" href="{{PREFIX}}assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="{{PREFIX}}assets/style.css">
+  <script src="{{PREFIX}}assets/app.js" defer></script>
 </head>
 <body>
-<a class="skip" href="#projects">跳到示例</a>
-<header class="bar"><a class="brand" href="./">u<span>l</span> / ultralight-py</a><nav aria-label="主导航"><a href="#projects">示例集</a><a href="#develop">参与开发</a><a href="https://github.com/shabbywu/ultralight-py-showcase">GitHub ↗</a></nav></header>
-<main>
-<section class="hero"><p class="eyebrow">THE SHOWCASE / PYTHON × JAVASCRIPT</p><h1>Python 的能力，<br><span>Web 的表达。</span></h1><p class="lead">从像素地牢到桥接实验室，探索 ultralight-py 如何让 Python 逻辑与 JavaScript 界面在原生桌面窗口中协作。</p><div class="actions"><a class="button" href="#projects">探索示例 ↓</a><a class="text-link" href="https://github.com/shabbywu/ultralight-py">了解 ultralight-py ↗</a></div><div class="stack"><span>Python objects</span><b>↔</b><span>JavaScript UI</span><b>→</b><span>Native desktop</span></div></section>
-<section id="projects"><div class="section-head"><div><p class="eyebrow">01 / EXPLORE</p><h2>示例集</h2></div><p>读源码 · 看实现 · 本地运行</p></div><p class="note">这里是静态展示站。原生 Python ↔ JS 桥接需要在桌面应用中运行；截图与项目介绍用于了解示例。</p>
-<!-- PROJECTS -->
-</section>
-<section id="develop" class="develop"><div><p class="eyebrow">02 / BUILD SOMETHING</p><h2>下一个示例，<br>从这里开始。</h2><p>已有独立仓库的示例以 submodule 接入；与展示站一起维护的示例放在 examples/ 下。每个项目保留自己的依赖、测试与运行说明。</p><a class="text-link" href="https://github.com/shabbywu/ultralight-py-showcase/blob/main/CONTRIBUTING.md">查看接入约定 ↗</a></div><div class="code"><span>获取展示站与示例源码</span><pre><code>git clone --recurse-submodules \
-  https://github.com/shabbywu/ultralight-py-showcase.git
+<a class="skip" href="#projects">{{skip}}</a>
+<header class="bar shell">
+  <a class="brand" href="./" aria-label="ultralight-py Showcase">
+    <span class="brand-icon" aria-hidden="true"><i></i><i></i></span>
+    <span><strong>ultralight-py <span class="brand-edition">SHOWCASE</span></strong><small>shabbywu/ultralight-py</small></span>
+  </a>
+  <nav class="main-nav" aria-label="{{nav_examples}}">
+    <a class="nav-link" href="#projects">{{nav_examples}}</a>
+    <a class="nav-link" href="#start">{{nav_start}}</a>
+    <div class="language" role="group" aria-label="{{language}}">{{LOCALE_NAV}}</div>
+    <a class="github-nav" href="https://github.com/shabbywu/ultralight-py">GitHub <span aria-hidden="true">↗</span></a>
+  </nav>
+</header>
+<main class="shell">
+  <section class="hero" aria-labelledby="hero-title">
+    <div class="hero-copy">
+      <p class="eyebrow">PYTHON × WEB × NATIVE</p>
+      <h1 id="hero-title">{{hero_first}}<br><span>{{hero_second}}</span></h1>
+      <p class="lead">{{hero_description}}</p>
+      <div class="actions"><a class="button" href="#projects">{{explore}} <span aria-hidden="true">↓</span></a><a class="button outline" href="https://github.com/shabbywu/ultralight-py">{{view_project}} <span aria-hidden="true">↗</span></a></div>
+    </div>
+    <div class="hero-art" role="img" aria-label="{{diagram_label}}">
+      <div class="window window-back"><span>● ● ●</span></div>
+      <div class="window window-middle"><span>● ● ●</span></div>
+      <div class="window window-front"><div class="bridge-words"><b>Python</b><em>↔</em><b>JavaScript</b></div><small>Native desktop</small></div>
+      <p class="art-caption">{{diagram_one}}<br>{{diagram_two}}<br>{{diagram_three}}<i></i></p>
+    </div>
+  </section>
+  <section id="projects" aria-labelledby="collection-title">
+    <div class="collection-head"><div><p class="eyebrow">01 / THE COLLECTION</p><h2 id="collection-title">{{collection_title}}</h2></div><p>{{collection_note}}</p></div>
+    <div class="collection-tools"><p class="media-note">{{motion_note}}</p><button class="text-button all-motion" type="button" hidden>{{all_pause}}</button><nav class="project-index" aria-label="{{project_index}}">{{PROJECT_INDEX}}</nav></div>
+    {{PROJECTS}}
+  </section>
+  <section id="start" class="start" aria-labelledby="start-title">
+    <div><p class="eyebrow">02 / MAKE IT YOURS</p><h2 id="start-title">{{start_title}}</h2><p>{{start_description}}</p></div>
+    <div class="start-links"><a class="button outline" href="https://github.com/shabbywu/ultralight-py">{{github}} <span aria-hidden="true">↗</span></a><a class="repo-link" href="https://github.com/shabbywu/ultralight-py">shabbywu/ultralight-py</a></div>
+  </section>
+  <details class="quickstart"><summary>{{local_guide}}</summary><div class="command"><pre><code>git clone --recurse-submodules https://github.com/shabbywu/ultralight-py-showcase.git
 cd ultralight-py-showcase
-
-# 本地预览展示站（Python 3.10+）
 python scripts/build_site.py
-python -m http.server 8000 --directory dist</code></pre></div></section>
-</main><footer><span>ultralight-py / Showcase</span><span>Python objects. JavaScript UI. Native desktop.</span><a href="assets/emberkeep-LICENSE.txt">Emberkeep 截图许可 · MIT</a></footer>
-</body></html>
+python -m http.server 8000 --directory dist</code></pre><button type="button" class="copy-command" hidden>{{copy}}</button><span class="copy-status" role="status"></span></div><p>{{footer_note}}</p></details>
+</main>
+<footer class="shell footer"><a href="./">ultralight-py / Showcase</a><span>Python. Web. Native.</span><a href="licenses.html">{{licenses}} ↗</a><span class="footer-note">{{footer_note}}</span></footer>
+<dialog class="lightbox" aria-labelledby="lightbox-title"><div class="lightbox-toolbar"><h2 id="lightbox-title"></h2><button type="button" class="lightbox-close">{{lightbox_close}} <span aria-hidden="true">×</span></button></div><img class="lightbox-image" alt=""><p>{{lightbox_note}} <a class="original-image" href="">{{open_image}} ↗</a></p></dialog>
+<script type="application/json" id="site-messages">{{MESSAGES}}</script>
+</body>
+</html>

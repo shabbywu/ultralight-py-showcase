@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Original PianoScope visual regression exercise; MIT. Directly authored MusicXML. -->
+<score-partwise version="4.0">
+  <work><work-title>连奏与再起音 · 下落练习</work-title></work>
+  <part-list><score-part id="P1"><part-name>钢琴</part-name></score-part></part-list>
+  <part id="P1">
+    <measure id="M1" number="1">
+      <attributes><divisions>4</divisions><key><fifths>0</fifths></key><time><beats>4</beats><beat-type>4</beat-type></time><staves>2</staves><clef number="1"><sign>G</sign><line>2</line></clef><clef number="2"><sign>F</sign><line>4</line></clef></attributes>
+      <sound tempo="120"/>
+      <note id="repeat-1"><pitch><step>C</step><octave>5</octave></pitch><duration>4</duration><voice>1</voice><type>quarter</type><staff>1</staff></note>
+      <note id="repeat-2"><pitch><step>C</step><octave>5</octave></pitch><duration>4</duration><voice>1</voice><type>quarter</type><staff>1</staff></note>
+      <note id="repeat-3"><pitch><step>C</step><octave>5</octave></pitch><duration>4</duration><voice>1</voice><type>quarter</type><staff>1</staff></note>
+      <note id="repeat-4"><pitch><step>C</step><octave>5</octave></pitch><duration>4</duration><voice>1</voice><type>quarter</type><staff>1</staff></note>
+      <backup><duration>16</duration></backup>
+      <note id="held-start"><pitch><step>C</step><octave>3</octave></pitch><duration>16</duration><tie type="start"/><voice>2</voice><type>whole</type><staff>2</staff><notations><tied type="start"/></notations></note>
+    </measure>
+    <measure id="M2" number="2">
+      <note id="long-attack"><pitch><step>C</step><octave>5</octave></pitch><duration>12</duration><voice>1</voice><type>half</type><dot/><staff>1</staff></note>
+      <note id="last-attack"><pitch><step>C</step><octave>5</octave></pitch><duration>2</duration><voice>1</voice><type>eighth</type><staff>1</staff></note>
+      <note id="last-rest"><rest/><duration>2</duration><voice>1</voice><type>eighth</type><staff>1</staff></note>
+      <backup><duration>16</duration></backup>
+      <note id="held-end"><pitch><step>C</step><octave>3</octave></pitch><duration>16</duration><tie type="stop"/><voice>2</voice><type>whole</type><staff>2</staff><notations><tied type="stop"/></notations></note>
+    </measure>
+  </part>
+</score-partwise>

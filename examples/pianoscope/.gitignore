@@ -1,0 +1,29 @@
+.venv/
+__pycache__/
+.pytest_cache/
+*.egg-info/
+build/
+dist/
+
+# Local inputs and development output belong in ../../.tmp/pianoscope/.
+/*.[mM][iI][dD]
+/*.[mM][iI][dD][iI]
+
+# Public docs contain only licenses and explicitly selected guide resources.
+# Plans, stage notes, validation reports and debug artifacts stay local.
+/docs/*
+!/docs/licenses/
+!/docs/screenshots/
+!/docs/samples/
+
+/docs/screenshots/*
+!/docs/screenshots/default-roll.png
+!/docs/screenshots/lazy-sheet.png
+!/docs/screenshots/audition-800.png
+!/docs/screenshots/hands-800.png
+!/docs/screenshots/roll-trails-animated.png
+
+/docs/samples/*
+!/docs/samples/first-light.pdf
+!/docs/samples/first-light.musicxml
+!/docs/samples/first-light.mid
