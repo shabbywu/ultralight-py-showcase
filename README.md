@@ -1,5 +1,7 @@
 # ultralight-py Showcase
 
+[简体中文](README.md) | [English](README.en.md)
+
 [shabbywu/ultralight-py](https://github.com/shabbywu/ultralight-py) 的中英文示例展示站与源码入口，展示 Python 逻辑与 JavaScript 界面在原生桌面中的协作。主项目入口始终指向 `shabbywu/ultralight-py`；本站源码与原生示例在本 showcase 仓库维护。
 
 | 示例 | 状态 | 源码组织 |
