@@ -1,5 +1,9 @@
-# PianoScope 展示截图
+# PianoScope demo assets / 展示素材说明
 
-`pianoscope.png` 是真实 AppCore CPU View.copy_pixels() 截图的正式展示副本。原始验证截图保存在本地 `.tmp/pianoscope/validation/screenshots/pianoscope-playing.png`，不随仓库提交。截图使用原创 MIDI“初光”和真实 FluidSynth／TimGM6mb 合成分析数据，没有使用 AI 设计参考图。
+Source: https://github.com/shabbywu/ultralight-py-showcase/tree/main/examples/pianoscope
 
-截图和 PianoScope 新增代码：MIT，版权 PianoScope contributors (2026)。源项目许可与音源、依赖说明见 `examples/pianoscope/LICENSE`、`examples/pianoscope/THIRD_PARTY_NOTICES.md`。SoundFont 原始数据另为 GPL-2.0，截图不包含音源文件。
+`pianoscope-demo.webp` and `pianoscope-poster.png` show actual AppCore CPU rendering of the original MusicXML score “初光 / First Light”, played by the existing SoundFont engine and device DAC clock. `pianoscope.png` is a real capture of the same app's lazily engraved grand-staff view. No MIDI-to-score conversion, generated screenshots, or composited results are used. Website animations are silent previews, resized and compressed from real window pixels.
+
+展示使用原创 MusicXML“初光”。动图为真实下落音符播放，静图为按需排版后的五线谱。原始帧和机器报告保留在根 .tmp/pianoscope 或 .tmp/site-redesign/，不随网站提交。
+
+Original score and PianoScope demo images: MIT, copyright (c) 2026 PianoScope contributors. See pianoscope-LICENSE.txt and the app's LICENSE / THIRD_PARTY_NOTICES.md. SoundFont data is separately GPL-2.0; the website contains no soundfont file, audio track, or font binaries.
