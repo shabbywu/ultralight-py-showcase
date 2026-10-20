@@ -34,7 +34,7 @@ def register_api(api, *, playground=None):
         return counter.reset()
 
     def get_status():
-        return {"ready": True, "version": "0.5.0", "counter": counter.value}
+        return {"ready": True, "version": "0.6.0", "counter": counter.value}
 
     for function in (add, delayed_double, divide, get_profile, reset_counter, get_status):
         api.register(function)

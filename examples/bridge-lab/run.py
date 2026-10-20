@@ -21,7 +21,7 @@ async def verify(view, screenshot=None):
         view.evaluate(f'BridgeLab.select({index})')
         if code is not None:
             view.evaluate('document.getElementById("editor").value = '+json.dumps(code))
-        result = await view.evaluate_async('BridgeLab.run()')
+        result = await view.evaluate_async('BridgeLab.run()', copy=True)
         results.append(result)
         print(json.dumps(result,ensure_ascii=False),flush=True)
         assert result['success'] is not failure, result
@@ -33,17 +33,17 @@ async def verify(view, screenshot=None):
     await case(1,['request started','result: 42'])
     await case(2,['before: 0','after: 2'])
     assert view.evaluate('BridgeLab.python.counter.value') == 2
-    await case(3,['length: 1','last: 7','snapshot: [7]'])
+    await case(3,['length: 1','last: 7','snapshot: [7]','from Python: 1','shared: true 7 true'])
     error = await case(4)
     assert len(error['output']) == 1 and 'zero' in error['output'][0].lower(),error
-    await case(5,['name: Bridge Lab','is plain JS: true','{"name":"Bridge Lab","version":"1.0","tags":["python","js"]}'])
+    await case(5,['name: Bridge Lab','keys visible: true','{"name":"Bridge Lab","version":"1.0","tags":["python","js"]}'])
     await case(4,code='lab.divide(1,0);',failure=True)
     await case(1,code='await py.delayed_double(21,2001);',failure=True)
     await case(0,['42'],'print(py.add(20,22));')
     view.evaluate('BridgeLab.select(1); BridgeLab.reset(); window.pendingRun=BridgeLab.run(); void 0')
     assert view.evaluate('BridgeLab.busy && document.getElementById("run").disabled')
     assert view.evaluate('BridgeLab.select(2) === false && BridgeLab.reset() === false')
-    assert await view.evaluate_async('BridgeLab.run()') is None
+    assert await view.evaluate_async('BridgeLab.run()', copy=True) is None
     pending = await view.evaluate_async('pendingRun')
     assert pending['output'] == ['request started','result: 42']
     assert view.evaluate('!BridgeLab.busy && !document.getElementById("run").disabled')
@@ -94,7 +94,7 @@ async def greet_later(name):
     await case(0, ['42'])
     if screenshot:
         view.evaluate('document.getElementById("clear").click(); BridgeLab.select(0); BridgeLab.reset()')
-        await view.evaluate_async('BridgeLab.run()')
+        await view.evaluate_async('BridgeLab.run()', copy=True)
         await asyncio.sleep(0.2)
         image = view.copy_pixels().to_rgba()
         import struct
@@ -116,8 +116,8 @@ def main():
     args=parser.parse_args()
     report={'platform':platform.platform(),'python':platform.python_version(),'success':False}
     try:
-        if version('ultralight-py')!='0.5.0':
-            raise RuntimeError('Requires ultralight-py==0.5.0')
+        if version('ultralight-py')!='0.6.0':
+            raise RuntimeError('Requires ultralight-py==0.6.0')
         from ultralight_py import API,Application,Resource
         assets=files('bridge_lab').joinpath('assets')
         mime={'html':'text/html','css':'text/css','js':'text/javascript'}

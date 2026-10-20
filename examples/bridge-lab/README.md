@@ -1,6 +1,6 @@
 # Ultralight Bridge Lab
 
-在 AppCore 原生窗口中同时编辑 Python 与 JavaScript，运行六类真实桥接示例：同步函数、asyncio Promise、实例、list 代理、异常和 dict 快照。使用 Python 3.10+ 与 ultralight-py==0.5.0，无需浏览器、Node 或 Web 服务。
+在 AppCore 原生窗口中同时编辑 Python 与 JavaScript，运行六类真实桥接示例：同步函数、asyncio Promise、实例、list 代理、异常和实时 dict。使用 Python 3.10+ 与 ultralight-py==0.6.0，无需浏览器、Node 或 Web 服务。
 
 ![实际 AppCore 窗口截图](docs/screenshots/bridge-lab.png)
 
@@ -37,7 +37,7 @@ JS 改为 `print(await lab.square(7));`，得到真实结果 `49`。
 - 每次运行重新初始化模块状态；切换保留两端草稿，重置恢复当前默认代码，退出后丢弃草稿。
 - Python 编译或加载失败时不执行 JS，并保留上一版模块；已发生的文件写入等外部副作用不回滚。
 - Python `print` 输出到启动终端；JS `print`、`console.log/warn/error` 输出到界面，日志最多 300 条、每条 4000 字符。
-- Python list/dict 为代理：用 `Python.getitem`、`Python.len` 访问；先 `Python.to_value` 再 JSON 序列化。快照修改不写回 Python。
+- Python list/dict 与 JS Array/Object 双向共享：直接使用索引、length、push、Object.keys 和 JSON.stringify。容器示例同时验证 JS 修改 Python list、Python 修改已有 JS 数组/对象，回传保留引用身份。Python 导出独立报告时显式使用 copy=True。
 - Inspector 读取当前模块的 `counter.value/history`，未定义时显示空值。以 `_` 开头的名称遵循绑定库私有成员规则，不自动导出。
 - 支持双端复制、系统编辑快捷键与 Tab 缩进；运行期间锁定编辑、切换和重复运行。
 
@@ -58,6 +58,16 @@ Windows PowerShell 用 `$env:BRIDGE_LAB_NATIVE='1'` 启用原生测试。冒烟�
 
 所有 Runtime/View 操作在主线程，由 AppCore run/run_async 驱动；加载模块不重绑 API、不重入 evaluate，退出时清理动态模块、源码缓存与原生资源。代码在当前桌面进程执行，阻塞操作会阻塞 UI，退出语句会退出进程。
 
-已按 0.5.0 安装源码与[官方 AppCore 示例](https://github.com/shabbywu/ultralight-py/blob/main/examples/appcore.py)核验：`wait_until` 接受 callable，检查 ready 前先等 `wait_settled`；ModuleType/SimpleNamespace 的动态成员无法直接被发现，因此用普通实例共享模块字典，导出真实对象代理。相对最初规格，Python 面板已全部改为可编辑，新增 `window.lab.run_python` 加载入口；JS 执行上下文中的 `lab` 指向本轮模块。
+已按 0.6.0 安装源码与[官方 AppCore 示例](https://github.com/shabbywu/ultralight-py/blob/main/examples/appcore.py)核验：`wait_until` 接受 callable，检查 ready 前先等 `wait_settled`；ModuleType/SimpleNamespace 的动态成员无法直接被发现，因此用普通实例共享模块字典，导出真实对象代理。相对最初规格，Python 面板已全部改为可编辑，新增 `window.lab.run_python` 加载入口；JS 执行上下文中的 `lab` 指向本轮模块。
 
 默认 1280×800，小于 1000px 时 Inspector 移到下方；内容最小宽度 580px，其余滚动。主动推送、导航恢复展示、日志导出与发行打包未实现。Ultralight SDK 和绑定遵守各自许可，商业分发需核验 SDK 授权。
+
+
+## 0.6.0 容器迁移
+
+list 改用原生 JS 数组接口，dict 直接取字段和枚举，无需 Python.to_value。
+Python list 保持稠密，delete 或跳跃写入用 undefined 填充；原生 JS 创建的数组保留稀疏行为。
+Python dict 的 JS 属性、Object.keys 和 JSON 只覆盖字符串键，其他键使用 Python.getitem 等高级接口。
+求值默认返回共享 JSArray/JSObject 视图，原生冒烟报告使用 copy=True 复制为可 JSON 编码的基础数据。
+
+2026-10-20：0.6.0 迁移在 macOS ARM64 / Python 3.13.0 下通过 18 项单元测试，CPU 与 GPU 原生冒烟各覆盖 21 个场景。

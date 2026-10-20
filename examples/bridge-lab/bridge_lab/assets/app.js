@@ -15,7 +15,7 @@ function saveDrafts(){drafts[selected]=$('editor').value;pythonDrafts[selected]=
 function sourceMode(){ $('source').readOnly=busy;$('sourceLabel').textContent='Python · 可编辑 · 运行时先加载';$('pythonHint').textContent='可使用正常 Python 语法、导入、函数与类。公开名称通过 JS 的 lab 对象访问；Python print 输出到启动终端。';}
 
 function controls(){sourceMode(); $('run').disabled=busy||!ready;$('reset').disabled=busy||!ready;$('editor').readOnly=busy;document.querySelectorAll('#cases button').forEach(b=>b.disabled=busy||!ready); }
-function inspect(state){const status=Python.to_value(lab.get_status());const counter=pythonModule ? pythonModule.counter : null;$('inspector').textContent=JSON.stringify({bridgeReady:status.ready,scenario:SAMPLES[selected].id,state,pythonLoaded:pythonModule!==null,counter:counter?counter.value:null,history:counter?Python.to_value(counter.history):null},null,2);$('status').textContent=state+' · '+SAMPLES[selected].id+' · AppCore / 本地资源';}
+function inspect(state){const status=lab.get_status();const counter=pythonModule ? pythonModule.counter : null;$('inspector').textContent=JSON.stringify({bridgeReady:status.ready,scenario:SAMPLES[selected].id,state,pythonLoaded:pythonModule!==null,counter:counter?counter.value:null,history:counter?counter.history:null},null,2);$('status').textContent=state+' · '+SAMPLES[selected].id+' · AppCore / 本地资源';}
 
 function select(i){if(busy||!ready)return false;saveDrafts();if(selected!==i)pythonModule=null;selected=i;$('editor').value=drafts[i];$('source').value=pythonDrafts[i];sourceMode();$('title').textContent=`0${i+1} · ${SAMPLES[i].title}`;$('expected').textContent='预期：'+SAMPLES[i].expected;document.querySelectorAll('#cases button').forEach((b,j)=>b.classList.toggle('active',i===j));inspect('就绪');return true;}
 async function run(){
@@ -35,5 +35,5 @@ $('run').onclick=run;$('reset').onclick=reset;$('copy').onclick=()=>copy('editor
 document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();run()}});
 window.addEventListener('pagehide',()=>{alive=false;ready=false;window.BRIDGE_LAB_READY=false});
 window.BridgeLab={run,select,reset,logs,get busy(){return busy},get python(){return pythonModule}};
-try{const status=Python.to_value(lab.get_status());if(status.ready!==true||lab.add(1,2)!==3)throw Error('Bridge 实际检查失败');ready=true;$('editor').value=drafts[0];$('source').value=pythonDrafts[0];select(0);controls();window.BRIDGE_LAB_READY=true;log('log',['真实 Python Bridge ready'])}catch(e){log('error',[e]);$('status').textContent='Bridge 初始化失败'}
+try{const status=lab.get_status();if(status.ready!==true||lab.add(1,2)!==3)throw Error('Bridge 实际检查失败');ready=true;$('editor').value=drafts[0];$('source').value=pythonDrafts[0];select(0);controls();window.BRIDGE_LAB_READY=true;log('log',['真实 Python Bridge ready'])}catch(e){log('error',[e]);$('status').textContent='Bridge 初始化失败'}
 })();

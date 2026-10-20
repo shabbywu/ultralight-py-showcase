@@ -14,3 +14,8 @@ class Counter:
         self.value = 0
         self.history.clear()
         return self.value
+
+    def share(self, items, options):
+        items.append(7)
+        options["enabled"] = True
+        return items

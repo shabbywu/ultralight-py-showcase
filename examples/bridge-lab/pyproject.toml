@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 name = "ultralight-bridge-lab"
 version = "1.0.0"
 requires-python = ">=3.10"
-dependencies = ["ultralight-py==0.5.0"]
+dependencies = ["ultralight-py==0.6.0"]
 [project.optional-dependencies]
 test = ["pytest>=8"]
 [tool.setuptools.package-data]
