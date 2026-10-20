@@ -49,6 +49,48 @@ async def verify(view, c, args, report):
         view.evaluate('App.view==="roll"&&App.rows.length===0')
         and not c.get_document()["layout_ready"],
     )
+    # Exercise the same records/arrays consumed directly by the settings UI.
+    shared = view.evaluate("window.containerProbe = piano.get_practice_settings()")
+    check(
+        "API records round-trip as original Python containers", isinstance(shared, dict)
+    )
+    original_staffs = list(shared["staff_ids"])
+    view.evaluate(
+        'containerProbe.staves[0].name="JS probe";'
+        'containerProbe.staff_ids.push("probe");true'
+    )
+    check(
+        "native JS property and array writes reach Python",
+        shared["staves"][0]["name"] == "JS probe"
+        and shared["staff_ids"] == original_staffs + ["probe"],
+    )
+    shared["staves"][0]["name"] = "Python probe"
+    check(
+        "Python writes appear through native JS array methods",
+        view.evaluate(
+            "Array.isArray(containerProbe.staves)&&"
+            'containerProbe.staves.map(s=>s.name).includes("Python probe")'
+        ),
+    )
+    view.evaluate("delete window.containerProbe")
+    check(
+        "editing a returned settings record does not apply a command",
+        c.get_practice_settings()["staff_ids"] == original_staffs,
+    )
+    check(
+        "async configuration captures native JS arrays before caller mutation",
+        await call(
+            """(async()=>{
+              const settings=piano.get_practice_settings();
+              const changes={staff_ids:settings.staff_ids.slice(),voice_ids:settings.voice_ids.slice()};
+              const expected=changes.staff_ids.join(',');
+              const pending=piano.configure(changes);
+              changes.staff_ids.push('invalid-after-call');
+              await pending;
+              return piano.get_practice_settings().staff_ids.join(',')===expected;
+            })()"""
+        ),
+    )
     report["initial_worker"] = "not_started: lazy staff layout"
     view.evaluate('document.getElementById("sheetMode").click();true')
     await view.wait_until(
@@ -183,14 +225,19 @@ async def verify(view, c, args, report):
             c.get_transport(),
         )
         check("post-gain device output", float(abs(c.audio.heard_window()).max()) > 0)
+        # Polling may publish another transport before the next Canvas frame.
+        # Compare highlights with the snapshot actually consumed by that frame.
+        before_paint = view.evaluate("App.lastPaint.seq")
         await view.wait_until(
             lambda: view.evaluate(
-                "App.lastPaint.seq===App.transport.seq&&App.lastPaint.ids.length>0"
+                "App.lastPaint.seq>"
+                + str(before_paint)
+                + "&&App.lastPaint.ids.length>0"
             ),
             timeout=5,
         )
         paint = view.evaluate(
-            "({paint:App.lastPaint,transport:App.transport})", copy=True
+            "({paint:App.lastPaint,transport:App.lastPaint.transport})", copy=True
         )
         check(
             "same DAC snapshot IDs actually painted",
