@@ -8,7 +8,7 @@ description = "MusicXML 驱动的原生钢琴阅读与练习播放器"
 requires-python = ">=3.10"
 dependencies = ["ultralight-py==0.5.0", "numpy==2.2.6", "mido==1.3.3", "sounddevice==0.5.6", "verovio==5.6.0", "CairoSVG==2.8.2", "pypdf==6.12.2", "fonttools==4.63.0", "psutil==7.2.2", "defusedxml==0.7.1", "pyobjc-framework-Cocoa==12.2.2; sys_platform == 'darwin'"]
 [project.optional-dependencies]
-test = ["pytest==9.1.1", "music21==9.9.1", "pymupdf==1.27.2.3"]
+test = ["ruff==0.15.12", "pytest==9.1.1", "music21==9.9.1", "pymupdf==1.27.2.3"]
 [tool.setuptools.package-data]
 pianoscope = ["assets/*", "resources/demos/*", "resources/soundfonts/*", "resources/fonts/*"]
 [tool.pytest.ini_options]
@@ -17,3 +17,11 @@ cache_dir = "../../.tmp/pianoscope/pytest-cache"
 addopts = "--basetemp=../../.tmp/pianoscope/pytest-tmp"
 [tool.setuptools.packages.find]
 include = ["pianoscope*"]
+
+[tool.ruff]
+target-version = "py310"
+required-version = "==0.15.12"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]

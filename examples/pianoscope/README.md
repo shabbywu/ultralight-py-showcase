@@ -73,7 +73,11 @@ grace、D.C./D.S./Fine/Coda 导航、嵌套反复、微分音、非零移调、�
 ## 测试与本地文件
 
 ```sh
+uv run --extra test python -m ruff format --no-cache --check .
+uv run --extra test python -m ruff check --no-cache .
 uv run --extra test python -m pytest -q
 ```
+
+Ruff 固定为 0.15.12，按 Python 3.10 检查；需要自动整理格式时运行 `uv run --extra test python -m ruff format --no-cache .`。
 
 个人曲目、开发规划、验收记录、机器报告、调试截图和中间产物放仓库根 `.tmp/pianoscope/`，不提交。`docs/` 只保留第三方许可、用户指南引用的正式图片和当前原创示例资源。
