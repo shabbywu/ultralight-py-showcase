@@ -1,11 +1,17 @@
-"""Playback events shared by the MusicXML compiler and sound engine."""
+"""由 MusicXML 编译器与原 SoundFont 内核共享的播放事件模型。"""
+
+from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
 
+from pianoscope.types import Record
+
 
 @dataclass
 class Note:
+    """供原 SoundFont 内核播放的单次起音，所有时间字段均为曲目秒数或显式 tick。"""
+
     id: str
     track_id: str
     pitch: int
@@ -22,25 +28,28 @@ class Note:
 
 @dataclass
 class Score:
+    """声音内核使用的轨道、按键、控制器及来源快照。"""
+
     title: str
     duration_s: float
-    tracks: list
-    notes: list
-    tempo_map: list
-    meter_map: list
-    controls: list = field(default_factory=list)
-    warnings: list = field(default_factory=list)
+    tracks: list[Record]
+    notes: list[Note]
+    tempo_map: list[Record]
+    meter_map: list[Record]
+    controls: list[Record] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
     score_id: str = field(default_factory=lambda: uuid.uuid4().hex)
     revision: int = 1
-    hand_assignment: dict = field(
+    hand_assignment: dict[str, str] = field(
         default_factory=lambda: {"status": "unassigned", "source": "external"}
     )
     ppqn: int = 480
     source_fingerprint: str = ""
-    key_map: list = field(default_factory=list)
+    key_map: list[Record] = field(default_factory=list)
     duration_tick: int = 0
 
-    def metadata(self):
+    def metadata(self) -> Record:
+        """返回播放事件的摘要、音域和来源元数据；要求至少存在一个音符。"""
         pitches = sorted({n.pitch for n in self.notes})
         return dict(
             score_id=self.score_id,

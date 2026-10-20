@@ -1,1 +1,1 @@
-"""MusicXML source, semantics, playback compilation and engraving."""
+"""MusicXML 源快照、精确语义、演奏编译及原生隔离排版。"""

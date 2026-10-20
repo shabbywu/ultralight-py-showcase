@@ -1,18 +1,28 @@
-"""Small explicit FluidSynth C ABI adapter. Never opens a MIDI/audio driver."""
+"""显式绑定 FluidSynth C ABI，仅生成样本，不打开 MIDI 或音频驱动。"""
+
+from __future__ import annotations
 
 import ctypes as C
 import ctypes.util
 import os
+from typing import Any
 
 import numpy as np
 
 from pianoscope.paths import RESOURCES
+from pianoscope.playback.types import PCM
 
 SOUNDFONT = RESOURCES / "soundfonts/TimGM6mb.sf2"
 
 
 class Synth:
-    def __init__(self, sample_rate=48000):
+    """独占 FluidSynth 实例与本地 SoundFont 的离线声音生成器。"""
+
+    def __init__(self, sample_rate: int = 48000) -> None:
+        """建立指定采样率的 FluidSynth 实例并加载随包 SoundFont，不开启设备驱动。
+
+        本机库、合成器或音源不可用时抛出 RuntimeError；虚拟通道用于隔离同音重叠。
+        """
         candidates = [
             os.environ.get("PIANOSCOPE_FLUIDSYNTH"),
             ctypes.util.find_library("fluidsynth"),
@@ -29,7 +39,8 @@ class Synth:
         if self.lib is None:
             raise RuntimeError("未找到 FluidSynth，请安装系统音频库后重试。")
 
-        def bind(name, result, *args):
+        def bind(name: str, result: Any, *args: Any) -> Any:
+            """按明确的返回与参数 C ABI 类型绑定原生函数；类型对象由 ctypes 提供。"""
             f = getattr(self.lib, name)
             f.restype = result
             f.argtypes = args
@@ -93,19 +104,24 @@ class Synth:
             self.program(self.synth, ch, sfid, 0, 0)
 
     @property
-    def version(self):
+    def version(self) -> str:
+        """返回当前加载的 FluidSynth 原生库版本字符串。"""
         return self.version_fn().decode()
 
-    def note_on(self, ch, pitch, velocity):
+    def note_on(self, ch: int, pitch: int, velocity: int) -> None:
+        """向独立虚拟通道发送 MIDI 音高和力度，范围由编译及渲染层校验。"""
         self.on(self.synth, ch, pitch, velocity)
 
-    def note_off(self, ch, pitch):
+    def note_off(self, ch: int, pitch: int) -> None:
+        """关闭指定虚拟通道上的按键，保留 SoundFont 自身的释放尾音。"""
         self.off(self.synth, ch, pitch)
 
-    def cc(self, ch, control, value):
+    def cc(self, ch: int, control: int, value: int) -> None:
+        """把已校验的 MIDI 控制器值发送到指定合成通道。"""
         self.control(self.synth, ch, control, value)
 
-    def samples(self, frames):
+    def samples(self, frames: int) -> PCM:
+        """生成指定帧数的双声道 float32 样本；原生生成失败时抛出 RuntimeError。"""
         pcm = np.empty((frames, 2), dtype=np.float32)
         if (
             frames
@@ -117,7 +133,8 @@ class Synth:
             raise RuntimeError("钢琴声音生成失败")
         return pcm
 
-    def close(self):
+    def close(self) -> None:
+        """幂等释放原生合成器和设置句柄，不访问音频设备。"""
         if self.synth:
             self.delete_synth(self.synth)
             self.synth = None
@@ -125,8 +142,10 @@ class Synth:
             self.delete_settings(self.settings)
             self.settings = None
 
-    def __enter__(self):
+    def __enter__(self) -> Synth:
+        """返回当前合成器，供上下文管理器独占使用。"""
         return self
 
-    def __exit__(self, *args):
+    def __exit__(self, *args: object) -> None:
+        """退出上下文时释放原生句柄，不吞掉上下文中的异常。"""
         self.close()

@@ -1,19 +1,24 @@
-"""PortAudio output, DAC timestamp mapping, bounded post-gain sample history.
+"""PortAudio 输出、DAC 时间映射和增益后样本历史。
 
-The callback only copies prepared PCM and updates preallocated sample slots.
-It never calls the UI, synthesizer, FFT, filesystem, or blocking locks.
-"""
+回调只复制已完成的 PCM 并更新预分配记录，不访问 UI、合成器、FFT、文件或阻塞锁。"""
+
+from __future__ import annotations
 
 import asyncio
 
 import numpy as np
 import sounddevice as sd
 
+from pianoscope.playback.types import PCM, AudioRecord, CallbackTime
+
 
 class Audio:
+    """唯一 PortAudio 输出与 DAC 时钟，回调只读取已经完成的 PCM。"""
+
     block = 512
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """初始化设备状态和预分配的回调历史缓冲，不打开设备。"""
         self.sample_rate = 48000
         self.stream = None
         self.error = None
@@ -49,7 +54,11 @@ class Audio:
         self.finish_dac = None
         self.device = None
 
-    def open(self):
+    def open(self) -> bool:
+        """依次尝试 48000 和 44100 Hz 双声道输出，返回设备是否就绪。
+
+        打开失败记录 error 并返回 False，不抛出设备初始化异常。
+        """
         self.close_stream()
         self.playing = False
         self.error = None
@@ -77,14 +86,19 @@ class Audio:
         self.ready = False
         return False
 
-    def install(self, pcm, rate, duration, position):
+    def install(self, pcm: PCM, rate: float, duration: float, position: float) -> None:
+        """停止输出并安装已完成的 PCM；duration、position 使用曲目秒数。
+
+        rate 为已应用的速度倍率；缓冲必须为双声道 float32，且在播放期间保持不变。
+        """
         self.halt()
         self.pcm = pcm
         self.rate = rate
         self.duration = duration
         self.set_position(position)
 
-    def _reset_history(self):
+    def _reset_history(self) -> None:
+        """推进时钟世代并清空 DAC 历史与淡入淡出状态，使旧回调记录失效。"""
         self.epoch += 1
         self.stamps.fill(0)
         self.finish_dac = None
@@ -94,12 +108,14 @@ class Audio:
         self.fade_requested = False
         self.fade_dac = None
 
-    def set_position(self, value):
+    def set_position(self, value: float) -> None:
+        """把曲目秒数换算为 PCM 帧位置并使旧时钟历史失效；边界由调用方校验。"""
         self.position = float(value)
         self.cursor = round(self.position / self.rate * self.sample_rate)
         self._reset_history()
 
-    def halt(self):
+    def halt(self) -> float:
+        """立即中止输出，返回最后可听见的曲目位置，并重置回调历史。"""
         position = self.clock()[0] if self.playing else self.position
         self.playing = False
         if self.stream and self.stream.active:
@@ -108,7 +124,11 @@ class Audio:
         self._reset_history()
         return position
 
-    async def fade_halt(self):
+    async def fade_halt(self) -> float:
+        """等待约 5 ms 淡出到达 DAC 后停止，返回曲目位置。
+
+        等待在应用事件循环中进行，最多使用有限超时，不阻塞音频回调。
+        """
         if self.playing and self.stream and self.stream.active:
             self.fade_requested = True
             # Yield on the application thread while a 5ms fade reaches the DAC.
@@ -123,7 +143,8 @@ class Audio:
                 )
         return self.halt()
 
-    def start(self):
+    def start(self) -> None:
+        """启动已就绪的设备并重置时钟世代；设备缺失或启动失败时抛出异常。"""
         if not self.ready or not self.stream:
             raise RuntimeError("未找到声音输出设备")
         self._reset_history()
@@ -135,7 +156,14 @@ class Audio:
             self.ready = False
             raise
 
-    def _callback(self, out, frames, time, status):
+    def _callback(
+        self, out: PCM, frames: int, time: CallbackTime, status: sd.CallbackFlags
+    ) -> None:
+        """向设备回调缓冲复制预渲染 PCM，并记录 outputBufferDacTime。
+
+        out 为可写双声道 float32，frames 为设备块帧数；此处不合成声音、不访问 UI，
+        不执行 FFT、文件 I/O 或阻塞锁。循环、淡入淡出及增益均使用预分配缓冲。
+        """
         if status.output_underflow:
             self.underruns += 1
         out.fill(0)
@@ -226,7 +254,11 @@ class Audio:
                 float(time.outputBufferDacTime) + offset / self.sample_rate
             )
 
-    def _records(self):
+    def _records(self) -> list[AudioRecord]:
+        """返回当前时钟世代中序号一致的回调记录，按提交顺序排列。
+
+        每项为序号、世代、DAC 秒数和分段列表；分段记录块内偏移、长度与源帧位置。
+        """
         result = []
         for slot in range(64):
             serial, epoch, dac, count = self.stamps[slot]
@@ -243,7 +275,11 @@ class Audio:
                     result.append((int(serial), int(epoch), float(dac), segments))
         return sorted(result, key=lambda s: s[0])
 
-    def clock(self):
+    def clock(self) -> tuple[float, bool, bool]:
+        """用设备 DAC 时间返回曲目位置、是否进入释放尾音、是否已播完。
+
+        设备断开时停止推进并记录错误；不使用前端或墙上时钟替代播放时钟。
+        """
         if not self.playing or not self.stream:
             return self.position, False, False
         try:
@@ -273,7 +309,11 @@ class Audio:
         self.position = pos
         return pos, tail, ended
 
-    def heard_window(self):
+    def heard_window(self) -> PCM:
+        """返回已到达 DAC 的最近 4096 帧增益后样本，形状为 (4096, 2)。
+
+        未播放或静音时返回零；只接受序号未被回调覆盖的历史片段。
+        """
         if not self.playing or self.volume == 0 or not self.stream:
             return np.zeros((4096, 2), np.float32)
         now = float(self.stream.time)
@@ -291,14 +331,16 @@ class Audio:
             result[-len(joined) :] = joined
         return result
 
-    def close_stream(self):
+    def close_stream(self) -> None:
+        """中止并关闭现有 PortAudio 流，清除设备就绪状态。"""
         if self.stream:
             self.stream.abort()
             self.stream.close()
             self.stream = None
         self.ready = False
 
-    def close(self):
+    def close(self) -> None:
+        """停止播放、关闭设备并释放当前 PCM 引用。"""
         self.playing = False
         self.close_stream()
         self.pcm = None

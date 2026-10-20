@@ -1,7 +1,26 @@
-"""Explicit MusicXML-only binding surface. Filesystem paths remain in Python."""
+"""显式的 MusicXML API 桥接表；文件路径始终保留在 Python 侧。"""
+
+from __future__ import annotations
+
+from collections.abc import Callable
+from typing import Protocol
+
+from pianoscope.app.controller import Controller
 
 
-def register(api, controller):
+class PianoAPI(Protocol):
+    """原生 API 桥接所需的最小注册接口，避免导入 AppCore 作为类型依赖。"""
+
+    def register(self, function: Callable[..., object]) -> object:
+        """注册可由 JavaScript 调用的同步或异步 Python 函数。"""
+        ...
+
+
+def register(api: PianoAPI, controller: Controller) -> None:
+    """把显式允许的控制器方法注册到 API("piano")。
+
+    api 为 ultralight-py 原生 API 对象；只暴露令牌与结构化记录，不暴露文件路径。
+    """
     for name in (
         "choose_score",
         "choose_score_folder",

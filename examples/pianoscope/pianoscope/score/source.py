@@ -1,4 +1,6 @@
-"""Bounded MusicXML source loading. Original bytes are never rewritten."""
+"""有界读取 MusicXML 源文件并保留原始字节，不改写输入乐谱。"""
+
+from __future__ import annotations
 
 import copy
 import hashlib
@@ -9,8 +11,11 @@ from collections import Counter
 from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path, PurePosixPath
+from typing import NoReturn
 
 from defusedxml import ElementTree as SafeET
+
+from pianoscope.types import Cancelled, PathInput, Record
 
 MAX_INPUT = 10 * 1024**2
 MAX_ENTRY = 16 * 1024**2
@@ -19,10 +24,11 @@ XML_ID = "{http://www.w3.org/XML/1998/namespace}id"
 ID_REFERENCES = {"part", "midi-instrument", "instrument", "midi-device"}
 
 
-def legal_id(value):
-    """XML 1.0 NCName, including legal non-ASCII source IDs."""
+def legal_id(value: str) -> bool:
+    """判断字符串是否为 XML 1.0 NCName，包含合法的非 ASCII 源 ID。"""
 
-    def start(c):
+    def start(c: str) -> bool:
+        """判断单个字符是否可作为 XML NCName 的首字符。"""
         n = ord(c)
         return (
             c == "_"
@@ -63,7 +69,16 @@ def legal_id(value):
 
 
 class ScoreInputError(ValueError):
-    def __init__(self, message, code="SCORE_INVALID", locator="", element_id=""):
+    """附错误码、源定位和元素身份的输入拒绝信息。"""
+
+    def __init__(
+        self,
+        message: str,
+        code: str = "SCORE_INVALID",
+        locator: str = "",
+        element_id: str = "",
+    ) -> None:
+        """保存错误码、中文消息、源 XPath 与元素 ID，供界面准确定位输入问题。"""
         super().__init__(message)
         self.code = code
         self.issues = [
@@ -76,12 +91,16 @@ class ScoreInputError(ValueError):
         ]
 
 
-def fail(message, locator="", code="SCORE_UNSUPPORTED"):
+def fail(message: str, locator: str = "", code: str = "SCORE_UNSUPPORTED") -> NoReturn:
+    """抛出带源位置与错误码的 ScoreInputError，不返回。"""
     raise ScoreInputError(message, code, locator)
 
 
-def safe_xml(data):
-    """External DOCTYPE is ignored; entities are refused by the parser itself."""
+def safe_xml(data: bytes) -> ET.Element:
+    """受限解析 XML 字节并返回根节点；忽略外部 DOCTYPE，拒绝实体与外部解析。
+
+    节点超过 200000 或嵌套深度超过 128 时抛出 ScoreInputError。
+    """
     try:
         parser = SafeET.iterparse(
             BytesIO(data),
@@ -108,6 +127,8 @@ def safe_xml(data):
 
 @dataclass(frozen=True)
 class SourceDocument:
+    """保留原始 XML／MXL 字节、源位置和独立工作树的不可变源快照。"""
+
     original_name: str
     original_bytes: bytes
     xml_bytes: bytes
@@ -116,16 +137,23 @@ class SourceDocument:
     root_entry: str
     # Serialized source tree is kept separately from the mutable working tree.
     preserved_tree: bytes
-    locations: dict
-    diagnostics: tuple
+    locations: dict[str, Record]
+    diagnostics: tuple[Record, ...]
     working_xml: str
 
     @property
-    def source_id(self):
+    def source_id(self) -> str:
+        """返回原始文件字节的 SHA-256，作为源乐谱的稳定身份。"""
         return self.sha256
 
 
-def read_source(path, cancelled=lambda: False):
+def read_source(
+    path: PathInput, cancelled: Cancelled = lambda: False
+) -> SourceDocument:
+    """分块读取 MusicXML／MXL 并保留原始字节，返回不可变源文档。
+
+    输入最多 10 MiB；取消抛出 InterruptedError，格式或安全限制失败抛出 ScoreInputError。
+    """
     path = Path(path)
     with path.open("rb") as stream:
         pieces, size = [], 0
@@ -143,7 +171,14 @@ def read_source(path, cancelled=lambda: False):
     return source_from_bytes(data, path.name, cancelled)
 
 
-def source_from_bytes(data, name="score.musicxml", cancelled=lambda: False):
+def source_from_bytes(
+    data: bytes, name: str = "score.musicxml", cancelled: Cancelled = lambda: False
+) -> SourceDocument:
+    """从原始文件字节构建源文档和独立工作树，不经 MIDI 或量化。
+
+    name 提供格式后缀；MXL 校验路径、解压大小与比例。原始容器、编码、源 ID 和位置
+    单独保留；格式或边界失败抛出 ScoreInputError，取消抛出 InterruptedError。
+    """
     if len(data) > MAX_INPUT:
         fail("乐谱文件超过 10 MiB", code="SCORE_LIMIT")
     if cancelled():
@@ -202,7 +237,8 @@ def source_from_bytes(data, name="score.musicxml", cancelled=lambda: False):
                         )
                     info_by_name[normalized] = info
 
-                def read_entry(name):
+                def read_entry(name: str) -> bytes:
+                    """按解压预算读取指定 MXL 条目，逐块检查取消及实际解压大小。"""
                     nonlocal total
                     if name not in info_by_name:
                         fail("MXL 必需条目不存在", name, "SCORE_CONTAINER")
@@ -272,7 +308,8 @@ def source_from_bytes(data, name="score.musicxml", cancelled=lambda: False):
     )
     locations, diagnostics = {}, []
 
-    def visit(node, locator):
+    def visit(node: ET.Element, locator: str) -> None:
+        """遍历工作树，记录源位置与稳定内部 ID，并移除工作副本中的外部资源引用。"""
         if cancelled():
             raise InterruptedError("已取消")
         original_id = node.get("id") or node.get(XML_ID)

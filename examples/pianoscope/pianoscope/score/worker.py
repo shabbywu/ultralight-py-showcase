@@ -1,4 +1,6 @@
-"""Isolated MusicXML layout/compilation worker, also used by the G0 gate."""
+"""隔离的 MusicXML 排版与演奏编译入口，输出可核验源副本、MIDI、PDF 和映射。"""
+
+from __future__ import annotations
 
 import json
 import sys
@@ -12,11 +14,21 @@ from pianoscope.score.midi import compile_midi
 from pianoscope.score.model import parse_score
 from pianoscope.score.plan import compile_plan
 from pianoscope.score.source import read_source
+from pianoscope.types import PathInput, Record
 
 
 def prepare(
-    source_path, directory, settings=None, original_name=None, source_revision=None
-):
+    source_path: PathInput,
+    directory: PathInput,
+    settings: Record | None = None,
+    original_name: str | None = None,
+    source_revision: str | None = None,
+) -> Record:
+    """在隔离进程中读取源语义、编译 MIDI、排版谱面并附真实源几何映射。
+
+    写出源文件逐字节副本、MIDI、PDF 和结构化结果；需要确认时仅返回确认请求。
+    source_revision 可绑定调用方快照，所有播放时值仍来自原 MusicXML。
+    """
     from pianoscope.score.engraving import engrave
 
     source = read_source(source_path)
@@ -77,7 +89,11 @@ def prepare(
     return data
 
 
-def main():
+def main() -> int:
+    """读取命令行作业目录的 request.json，将成功或带源定位的失败写入 result.json。
+
+    成功返回退出码 0，准备失败返回 1；原生错误堆栈写入子进程日志。
+    """
     directory = Path(sys.argv[1])
     request = json.loads((directory / "request.json").read_text())
     try:

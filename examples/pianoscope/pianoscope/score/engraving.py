@@ -1,33 +1,43 @@
-"""Native engraving and geometry. This module runs only in the score worker.
+"""原生排版及真实几何提取，仅在隔离乐谱工作器中运行。
 
-SVG coordinates are transformed from Verovio's definition-scale viewBox to the
-outer pixel viewBox. Notehead bounds come from the actual embedded glyph path,
-not estimated pitch positions or whole-note (stem-inclusive) rectangles.
-"""
+坐标从 Verovio 内部 viewBox 换算为外层像素，符头边界取实际字形路径，
+不估算音高，也不使用包含符干的整个音符边框替代符头。"""
+
+from __future__ import annotations
 
 import ctypes.util
 import math
 import re
 import xml.etree.ElementTree as ET
+from collections.abc import Collection
 from pathlib import Path
+from types import ModuleType
+from typing import NoReturn
 
 from pianoscope.paths import RESOURCES
 from pianoscope.score.source import ScoreInputError as NotationError
+from pianoscope.types import Cancelled, PathInput, Record
 
 SVG = "http://www.w3.org/2000/svg"
 XLINK = "http://www.w3.org/1999/xlink"
 
 
-def deny_external_resource(url, resource_type):
+def deny_external_resource(url: str, resource_type: str) -> NoReturn:
+    """拒绝 CairoSVG 的外部资源读取并抛出 NotationError，确保排版仅使用本地受控资源。"""
     raise NotationError("排版资源禁止外部读取：" + str(resource_type))
 
 
-def cairo_module():
+def cairo_module() -> ModuleType:
     # cairocffi uses find_library; macOS Homebrew is not in dyld's search path.
     # This temporary resolver is confined to an isolated worker process.
+    """在隔离排版进程中临时定位 Homebrew Cairo，返回 cairosvg 模块。
+
+    导入结束后恢复 ctypes 库定位函数，不改变主进程的动态库搜索。
+    """
     original = ctypes.util.find_library
 
-    def find(name):
+    def find(name: str) -> str | None:
+        """先调用系统库定位器，仅对 Cairo 名称补充已知 Homebrew 路径。"""
         result = original(name)
         if result or name not in ("cairo", "cairo-2", "libcairo-2"):
             return result
@@ -46,8 +56,8 @@ def cairo_module():
         ctypes.util.find_library = original
 
 
-def text_paths(text, x, baseline, size):
-    """Outline local OFL Chinese font, so PDF/PNG never depend on host fonts."""
+def text_paths(text: str, x: float, baseline: float, size: float) -> ET.Element:
+    """用随包中文字体把文本转为 SVG 路径；坐标、基线和字号使用 SVG 用户单位。"""
     from fontTools.pens.svgPathPen import SVGPathPen
     from fontTools.ttLib import TTFont
 
@@ -73,9 +83,11 @@ def text_paths(text, x, baseline, size):
     return group
 
 
-def outline_text(root, resource_path):
-    """Cairo ignores SVG @font-face. Outline every actual text leaf, using
-    Verovio's local SMuFL paths for music and the bundled OFL font for text."""
+def outline_text(root: ET.Element, resource_path: PathInput) -> None:
+    """原地把 SVG 文字叶节点转换为随包中文字体或本地 SMuFL 路径。
+
+    不依赖宿主字体；缺失字形或音乐字体资源时抛出 ValueError。
+    """
 
     from fontTools.pens.svgPathPen import SVGPathPen
     from fontTools.ttLib import TTFont
@@ -90,7 +102,8 @@ def outline_text(root, resource_path):
                 continue
             parts = []
 
-            def walk(node, size=0, family=""):
+            def walk(node: ET.Element, size: float = 0, family: str = "") -> None:
+                """递归继承字号与字体族，收集文字叶节点的字形、缩放和前进宽度。"""
                 size = float(node.attrib.get("font-size", str(size)).replace("px", ""))
                 family = node.attrib.get("font-family", family)
                 if not list(node) and node.text and node.text.strip():
@@ -170,7 +183,11 @@ def outline_text(root, resource_path):
     font.close()
 
 
-def geometry(svg, hidden_ids=()):
+def geometry(svg: str, hidden_ids: Collection[str] = ()) -> Record:
+    """从实际 SVG 字形路径提取像素坐标中的符头、休止、小节和谱行边界。
+
+    hidden_ids 为源隐藏元素；不估算音高或使用含符干的整体边框代替符头。
+    """
     from fontTools.pens.boundsPen import BoundsPen
     from fontTools.svgLib.path import parse_path
 
@@ -191,7 +208,8 @@ def geometry(svg, hidden_ids=()):
     measures = []
     glyphs = []
 
-    def box(rect):
+    def box(rect: ET.Element) -> list[float]:
+        """把内部 viewBox 矩形转换为外层像素坐标 [x, y, width, height]。"""
         a = rect.attrib
         return [
             (float(a["x"]) + tx) * sx,
@@ -281,14 +299,19 @@ def geometry(svg, hidden_ids=()):
 
 
 def engrave(
-    xml,
-    title,
-    directory,
-    cancelled=lambda: False,
-    caption=None,
-    layout_options=None,
-    hidden_ids=(),
-):
+    xml: str,
+    title: str,
+    directory: PathInput,
+    cancelled: Cancelled = lambda: False,
+    caption: str | None = None,
+    layout_options: Record | None = None,
+    hidden_ids: Collection[str] = (),
+) -> Record:
+    """直接排版派生 MusicXML／MEI，写出实际 SVG、PNG 和 A4 PDF，返回几何清单。
+
+    只在隔离进程调用；源编码分页溢出时有界重排一次。取消抛出 InterruptedError，
+    无真实几何、页面超限或重排后仍越界时拒绝结果，不发布裁切谱面。
+    """
     import verovio
 
     cairo = cairo_module()

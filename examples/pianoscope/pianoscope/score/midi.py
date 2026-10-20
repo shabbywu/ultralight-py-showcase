@@ -1,14 +1,20 @@
-"""Standard MIDI File writer and the adapter for the existing sound engine."""
+"""从源语义的真实演奏计划编码标准 MIDI，并适配原声音内核。"""
+
+from __future__ import annotations
 
 import math
 import struct
+from collections.abc import Iterable
 from fractions import Fraction as Q
 
 from pianoscope.playback.model import Note, Score
+from pianoscope.score.plan import PlaybackPlan
 from pianoscope.score.source import fail
+from pianoscope.types import Record
 
 
-def variable(value):
+def variable(value: int) -> bytes:
+    """编码 SMF 可变长度无符号整数；超过 28 位范围抛出 ScoreInputError。"""
     if not 0 <= value <= 0x0FFFFFFF:
         fail("MIDI delta tick 超出 SMF 范围", code="MIDI_PRECISION")
     output = [value & 127]
@@ -18,7 +24,10 @@ def variable(value):
     return bytes(output)
 
 
-def encode_track(events, end_tick):
+def encode_track(
+    events: Iterable[tuple[int, int, int, bytes, Record | None]], end_tick: int
+) -> bytes:
+    """按 tick、优先级和源顺序编码真实轨道事件，追加轨道结束消息。"""
     out, previous = bytearray(), 0
     for tick, priority, ordinal, data, _ in sorted(events, key=lambda e: e[:3]):
         out += variable(tick - previous) + data
@@ -27,14 +36,20 @@ def encode_track(events, end_tick):
     return b"MTrk" + struct.pack(">I", len(out)) + out
 
 
-def compile_midi(plan):
+def compile_midi(plan: PlaybackPlan) -> bytes:
+    """把同一演奏计划精确编码为 Type 1 MIDI，返回字节并写入计划的事件映射。
+
+    PPQN 取有理数分母的公倍数；无法在 32767 内无损表达或路由超限时带源位置拒绝。
+    默认导出完整基准演奏，不受试听手别、范围和速度影响。
+    """
     positions = [plan.duration_qn]
     positions += [n[k] for n in plan.instances for k in ("onset_qn", "key_off_qn")]
     positions += [t["qn"] for t in plan.tempos] + [c["qn"] for c in plan.controls]
     positions += [o[k] for o in plan.occurrences for k in ("start_qn", "end_qn")]
     positions += [s[k] for s in plan.display_spans for k in ("start_qn", "end_qn")]
 
-    def locator(position):
+    def locator(position: Q) -> str:
+        """为无法编码的拍位选择源命令或所属小节的定位路径。"""
         locations = plan.document.source.locations
         for o in plan.occurrences:
             m = plan.document.measures[o["written_index"]]
@@ -88,7 +103,8 @@ def compile_midi(plan):
         n["midi_channel"] = routes[key]
     events, event_map = [], []
 
-    def add(tick, priority, payload, record):
+    def add(tick: int, priority: int, payload: bytes, record: Record | None) -> None:
+        """追加带稳定顺序的 MIDI 事件，并同步登记可追溯的源映射。"""
         ordinal = len(events)
         events.append((int(tick), priority, ordinal, payload, record))
         if record:
@@ -179,8 +195,8 @@ def compile_midi(plan):
     return plan.midi_bytes
 
 
-def sound_score(plan):
-    """Typed data adaptation only. Never parse MIDI back into notation."""
+def sound_score(plan: PlaybackPlan) -> Score:
+    """将真实演奏实例适配为原 SoundFont 内核使用的播放事件，不重新解析或量化 MIDI。"""
     ppqn = plan.midi_precision["ppqn"]
     tracks = [
         dict(

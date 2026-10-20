@@ -1,4 +1,6 @@
-"""Finite score-path expansion, exact tempo integration and sounding instances."""
+"""有界展开反复路径，以有理数积分速度并生成实际发声实例。"""
+
+from __future__ import annotations
 
 import bisect
 import hashlib
@@ -6,29 +8,35 @@ import json
 from collections import defaultdict
 from dataclasses import dataclass, field
 from fractions import Fraction as Q
+from typing import NoReturn
 
-from pianoscope.score.source import fail
+from pianoscope.score.model import Measure, ScoreDocument, ScoreElement
+from pianoscope.score.source import SourceDocument, fail
+from pianoscope.types import Cancelled, Record
 
 
 @dataclass
 class PlaybackPlan:
-    document: object
-    occurrences: list
-    instances: list
-    tempos: list
-    controls: list
-    display_spans: list
+    """有界展开后的演奏实例、节内速度、延音及源显示关系。"""
+
+    document: ScoreDocument
+    occurrences: list[Record]
+    instances: list[Record]
+    tempos: list[Record]
+    controls: list[Record]
+    display_spans: list[Record]
     duration_qn: Q
     revision: str
-    settings: dict
+    settings: Record
     midi_bytes: bytes = b""
-    midi_event_map: list = field(default_factory=list)
-    midi_precision: dict = field(default_factory=dict)
-    diagnostics: list = field(default_factory=list)
-    _tempo_qn: list = field(default_factory=list, repr=False)
-    _tempo_seconds: list = field(default_factory=list, repr=False)
+    midi_event_map: list[Record] = field(default_factory=list)
+    midi_precision: Record = field(default_factory=dict)
+    diagnostics: list[Record] = field(default_factory=list)
+    _tempo_qn: list[Q] = field(default_factory=list, repr=False)
+    _tempo_seconds: list[Q] = field(default_factory=list, repr=False)
 
-    def seconds(self, position):
+    def seconds(self, position: Q | int | float) -> Q:
+        """把四分音符拍位积分为精确秒数，并缓存节内速度分段；不做时值量化。"""
         position = Q(position)
         if not self._tempo_qn:
             total = Q(0)
@@ -45,16 +53,19 @@ class PlaybackPlan:
         )
 
     @property
-    def duration_s(self):
+    def duration_s(self) -> float:
+        """返回展开后完整演奏路径的秒数，不包含合成器释放尾音。"""
         return float(self.seconds(self.duration_qn))
 
-    def occurrence_at(self, seconds):
+    def occurrence_at(self, seconds: float) -> Record:
+        """按曲目秒数查找小节出现记录；起点之前返回首次出现。"""
         index = (
             bisect.bisect_right([o["start_s"] for o in self.occurrences], seconds) - 1
         )
         return self.occurrences[max(0, index)]
 
-    def qn_at_seconds(self, seconds):
+    def qn_at_seconds(self, seconds: float) -> float:
+        """按相同节内速度分段把曲目秒数反算为四分音符拍位。"""
         self.seconds(0)
         i = max(0, bisect.bisect_right(self._tempo_seconds, seconds) - 1)
         t = self.tempos[i]
@@ -63,7 +74,13 @@ class PlaybackPlan:
             + max(0.0, seconds - float(self._tempo_seconds[i])) * float(t["bpm"]) / 60
         )
 
-    def seek_target(self, element_id, seconds=0, occurrence_id=None):
+    def seek_target(
+        self, element_id: str, seconds: float = 0, occurrence_id: str | None = None
+    ) -> Record:
+        """解析源元素对应的起音或休止定位，返回目标与全部反复遍次选项。
+
+        未指定 occurrence_id 时优先当前遍次，再选后续遍次；过期元素或遍次抛出 ScoreInputError。
+        """
         candidates = [s for s in self.display_spans if s["element_id"] == element_id]
         if not candidates:
             # Rests and measure anchors have no note-on, but still have occurrences.
@@ -107,8 +124,11 @@ class PlaybackPlan:
         return dict(target, choices=list(choices.values()))
 
 
-def expand_path(measures):
-    """Non-nested repeat regions, with alternatives retained in written order."""
+def expand_path(measures: list[Measure]) -> list[int]:
+    """按源顺序有界展开非嵌套反复和一二结尾，返回书写小节的索引序列。
+
+    不明确路径、嵌套或展开超过 1024 次小节出现时抛出 ScoreInputError。
+    """
     regions, start, prior_end = [], None, -1
     for i, measure in enumerate(measures):
         if measure.forward:
@@ -159,10 +179,16 @@ def expand_path(measures):
     return path
 
 
-def performed_notes(measure, source, diagnostics):
-    """Source-declared ornaments only; exact bounded events, no quantization."""
+def performed_notes(
+    measure: Measure, source: SourceDocument, diagnostics: list[Record]
+) -> list[tuple[ScoreElement, Q, Q]]:
+    """把源声明的琶音与定量震音展开为元素、起音拍位、松键拍位三元组。
 
-    def error(e, text):
+    采用已说明的有理数间隔策略，不量化源时值；不支持的组合带源位置拒绝。
+    """
+
+    def error(e: ScoreElement, text: str) -> NoReturn:
+        """用装饰音所属源元素的位置抛出不可执行记号错误。"""
         fail(text, source.locations[e.id]["source_locator"])
 
     arps = defaultdict(list)
@@ -200,7 +226,8 @@ def performed_notes(measure, source, diagnostics):
             clusters[e.onset].append(e)
         groups = [clusters[q] for q in sorted(clusters)]
 
-        def signature(group):
+        def signature(group: list[ScoreElement]) -> tuple[str, int, Q] | None:
+            """返回同一和弦一致的震音记号；矛盾的震音声明抛出源错误。"""
             marks = {e.tremolo for e in group if e.tremolo}
             if len(marks) > 1:
                 error(group[0], "同一和弦震音记号矛盾")
@@ -263,7 +290,16 @@ def performed_notes(measure, source, diagnostics):
     return sorted(result, key=lambda item: item[1])
 
 
-def compile_plan(document, settings=None, cancelled=lambda: False):
+def compile_plan(
+    document: ScoreDocument,
+    settings: Record | None = None,
+    cancelled: Cancelled = lambda: False,
+) -> PlaybackPlan:
+    """从单一源语义生成反复遍次、真实起音、延音和节内速度映射。
+
+    保留元素与实例的关系，合并 tie 起音并解析踏板；限制 20000 个实例及基准 600 秒。
+    未确认、冲突或超限时抛出 ScoreInputError，取消时抛出 InterruptedError。
+    """
     settings = dict(settings or {})
     if document.needs_confirmation:
         fail(
@@ -283,7 +319,8 @@ def compile_plan(document, settings=None, cancelled=lambda: False):
     pedals = {p["id"]: 0 for p in document.parts}
     entry_states = []
 
-    def resolved(directions):
+    def resolved(directions: list[Record]) -> list[Record]:
+        """按位置、作用域和优先级解析速度、力度与踏板命令，拒绝同优先级冲突。"""
         grouped = defaultdict(list)
         for d in directions:
             kind = "velocity" if d["kind"] == "dynamics" else d["kind"]

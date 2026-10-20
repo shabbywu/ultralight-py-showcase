@@ -1,12 +1,18 @@
-"""Offline event-time rendering. A job exclusively owns its synthesizer."""
+"""按真实事件时刻离线合成；每个准备作业独占一个合成器。"""
+
+from __future__ import annotations
 
 import numpy as np
 
 from pianoscope.playback.budget import require_pcm_budget
+from pianoscope.playback.model import Note, Score
 from pianoscope.playback.synth import Synth
+from pianoscope.playback.types import PCM, PlaybackConfig
+from pianoscope.types import Cancelled, Progress
 
 
-def audible_notes(score, config):
+def audible_notes(score: Score, config: PlaybackConfig) -> list[Note]:
+    """按轨道、独奏、手别和显式音符范围返回实际可听事件，不修改原事件。"""
     tracks = {t["id"]: t for t in config["tracks"]}
     solo = any(t["solo"] for t in tracks.values())
     allowed = config.get("allowed_note_ids")
@@ -22,8 +28,17 @@ def audible_notes(score, config):
 
 
 def render(
-    score, config, sample_rate, cancelled=lambda: False, progress=lambda _: None
-):
+    score: Score,
+    config: PlaybackConfig,
+    sample_rate: int,
+    cancelled: Cancelled = lambda: False,
+    progress: Progress = lambda _: None,
+) -> PCM:
+    """由真实播放事件离线合成只读双声道 float32 PCM，并保留两秒释放尾音。
+
+    sample_rate 为设备采样率；每个作业独占一个 SoundFont 合成器。progress 接收 0–1
+    进度，cancelled 为真时抛出 InterruptedError；预算或通道容量超限抛出 ValueError。
+    """
     rate = config["rate"]
     count = round((score.duration_s / rate + 2) * sample_rate)
     require_pcm_budget(count * 8)
@@ -75,7 +90,8 @@ def render(
     with Synth(sample_rate) as synth:
         cursor = 0
 
-        def fill(target):
+        def fill(target: int) -> None:
+            """以最多 2048 帧的小块合成到目标帧，同时检查取消并报告进度。"""
             nonlocal cursor
             while cursor < target:
                 if cancelled():

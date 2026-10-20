@@ -24,4 +24,11 @@ required-version = "==0.15.12"
 line-length = 88
 
 [tool.ruff.lint]
-select = ["E4", "E7", "E9", "F", "I"]
+select = ["E4", "E7", "E9", "F", "I", "ANN", "D1"]
+# ctypes/PyObjC and the leaf-preserving record converter have dynamic types.
+ignore = ["ANN401"]
+
+[tool.ruff.lint.per-file-ignores]
+"run.py" = ["ANN", "D1"]
+"tests/**/*.py" = ["ANN", "D1"]
+"tools/**/*.py" = ["ANN", "D1"]

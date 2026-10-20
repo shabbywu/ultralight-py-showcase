@@ -88,4 +88,6 @@ uv run --extra test python -m pytest -q
 
 Ruff 固定为 0.15.12，按 Python 3.10 检查；需要自动整理格式时运行 `uv run --extra test python -m ruff format --no-cache .`。
 
+`pianoscope/` 的生产函数使用类型标注和中文文档字符串；Ruff 检查参数、返回值标注及文档是否缺失。拍位使用 `Fraction`，声音缓冲为双声道 `float32` 数组，跨界面异构记录与原生 C／PyObjC 边界保留必要的动态类型。这些检查不等同于完整静态类型检查。
+
 个人曲目、开发规划、验收记录、机器报告、调试截图和中间产物放仓库根 `.tmp/pianoscope/`，不提交。`docs/` 只保留第三方许可、用户指南引用的正式图片和当前原创示例资源。

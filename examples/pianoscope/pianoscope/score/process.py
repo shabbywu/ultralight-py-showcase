@@ -1,4 +1,6 @@
-"""Bounded, cancellable native score worker. No View calls off the app thread."""
+"""有界运行隔离乐谱工作器，负责取消、超时、内存限制和结果回收。"""
+
+from __future__ import annotations
 
 import json
 import subprocess
@@ -8,8 +10,19 @@ from pathlib import Path
 
 import psutil
 
+from pianoscope.types import Cancelled, PathInput, PhaseProgress, Record
 
-def run_preparation(directory, cancelled=lambda: False, progress=lambda phase: None):
+
+def run_preparation(
+    directory: PathInput,
+    cancelled: Cancelled = lambda: False,
+    progress: PhaseProgress = lambda phase: None,
+) -> Record:
+    """启动 pianoscope.score.worker 并读取准备结果，返回附原生资源指标的清单。
+
+    directory 必须已有 request.json；限制子进程 512 MiB／60 秒及产物 128 MiB。
+    取消、超时或内存超限时终止并回收子进程；工作器错误保留源定位与错误码。
+    """
     directory = Path(directory)
     started = time.monotonic()
     peak = 0

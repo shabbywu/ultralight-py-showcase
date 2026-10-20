@@ -1,12 +1,16 @@
-"""Exact score semantics. No MIDI import, quantization or inferred notation."""
+"""直接读取 MusicXML 语义与精确时值，不使用 MIDI 或量化作为中间表示。"""
+
+from __future__ import annotations
 
 import hashlib
 import re
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from fractions import Fraction as Q
+from typing import NoReturn
 
-from pianoscope.score.source import fail
+from pianoscope.score.source import SourceDocument, fail
+from pianoscope.types import Cancelled, Record
 
 UNITS = {
     "whole": Q(4),
@@ -67,6 +71,8 @@ UNSUPPORTED.update(
 
 @dataclass(frozen=True)
 class ScoreElement:
+    """源音符或休止的精确语义；onset 与 duration 均以四分音符拍位表示。"""
+
     id: str
     measure_uid: str
     part_id: str
@@ -75,7 +81,7 @@ class ScoreElement:
     onset: Q
     duration: Q
     pitch: int | None
-    written_pitch: tuple | None
+    written_pitch: tuple[str, int, int] | None
     tie_start: bool = False
     tie_stop: bool = False
     tie_number: str = "1"
@@ -83,44 +89,59 @@ class ScoreElement:
     cue: bool = False
     visible: bool = True
     velocity_override: int | None = None
-    arpeggio: tuple | None = None
-    tremolo: tuple | None = None
+    arpeggio: tuple[str, str | None] | None = None
+    tremolo: tuple[str, int, Q] | None = None
 
 
 @dataclass
 class Measure:
+    """书写小节的语义及反复标记，尚未展开为演奏遍次。"""
+
     id: str
     number: str
     length: Q
-    meter: tuple
-    elements: list = field(default_factory=list)
-    directions: list = field(default_factory=list)
+    meter: tuple[int, int]
+    elements: list[ScoreElement] = field(default_factory=list)
+    directions: list[Record] = field(default_factory=list)
     forward: bool = False
     repeat_times: int = 0
-    endings: tuple = ()
+    endings: tuple[int, ...] = ()
 
 
 @dataclass
 class ScoreDocument:
-    source: object
+    """同一源文件的已解析文档，保留诊断及必须确认的播放设置。"""
+
+    source: SourceDocument
     title: str
-    parts: list
-    measures: list
-    diagnostics: list
-    needs_confirmation: dict
+    parts: list[Record]
+    measures: list[Measure]
+    diagnostics: list[Record]
+    needs_confirmation: dict[str, str]
     revision: str
 
     @property
-    def elements(self):
+    def elements(self) -> list[ScoreElement]:
+        """按源小节顺序返回所有语义元素，包括休止、隐藏音符与提示音符。"""
         return [e for m in self.measures for e in m.elements]
 
 
-def parse_score(source, settings=None, cancelled=lambda: False):
+def parse_score(
+    source: SourceDocument,
+    settings: Record | None = None,
+    cancelled: Cancelled = lambda: False,
+) -> ScoreDocument:
+    """从源 MusicXML 的 duration／divisions 编译精确语义，不依赖排版结果或 MIDI。
+
+    settings 可确认缺失速度与双分部钢琴组；未确认项目写入 needs_confirmation。
+    不支持或矛盾的记号带源位置抛出 ScoreInputError；取消抛出 InterruptedError。
+    """
     settings = settings or {}
     root = ET.fromstring(source.working_xml)
     diagnostics = list(source.diagnostics)
 
-    def error(node, message):
+    def error(node: ET.Element, message: str) -> NoReturn:
+        """将当前 XML 节点的内部身份转换为源位置并抛出语义错误。"""
         fail(
             message,
             source.locations.get(node.get("_ps_id"), {}).get("source_locator", ""),

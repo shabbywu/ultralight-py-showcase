@@ -1,13 +1,20 @@
-"""Connect actual engraving geometry to immutable source and playback IDs."""
+"""把实际符头几何连接到稳定的源元素、演奏实例和反复遍次。"""
+
+from __future__ import annotations
 
 import hashlib
 import xml.etree.ElementTree as ET
 from fractions import Fraction as Q
+from typing import Any
 
+from pianoscope.score.model import ScoreDocument
+from pianoscope.score.plan import PlaybackPlan
 from pianoscope.score.source import fail
+from pianoscope.types import Record
 
 
-def layout_input(document):
+def layout_input(document: ScoreDocument) -> str:
+    """生成仅供排版的 XML 字符串，保留音符和小节身份，不修改保留的源文件。"""
     root = ET.fromstring(document.source.working_xml)
     for node in root.iter():
         internal = node.attrib.pop("_ps_id", None)
@@ -17,7 +24,13 @@ def layout_input(document):
     return ET.tostring(root, encoding="unicode")
 
 
-def attach_mapping(document, plan, manifest):
+def attach_mapping(
+    document: ScoreDocument, plan: PlaybackPlan, manifest: Record
+) -> Record:
+    """原地连接真实符头几何、源元素和演奏遍次，并返回同一 manifest。
+
+    隐式休止只作小节锚点；符头缺失、身份变化、超出页边界或字形超限时拒绝发布。
+    """
     by_id = {e.id: e for e in document.elements if e.visible}
     measures = {m.id: m for m in document.measures}
     seen = set()
@@ -112,7 +125,11 @@ def attach_mapping(document, plan, manifest):
     return manifest
 
 
-def json_value(value):
+def json_value(value: Any) -> Any:
+    """递归把 Fraction 转为分子分母数组，把元组转为数组，保留其他叶值。
+
+    该函数不校验任意对象是否可序列化；调用方只应传入结构化记录与 JSON 基础值。
+    """
     if isinstance(value, Q):
         return [value.numerator, value.denominator]
     if isinstance(value, dict):

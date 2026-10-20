@@ -1,14 +1,18 @@
-"""Verified source-to-MEI repairs for the fixed Verovio MusicXML importer.
+"""为固定版 Verovio 生成已验证的源到 MEI 排版修复。
 
-MEI remains a derived layout intermediate. It never supplies playback timing.
-"""
+MEI 仅为派生排版输入，永不提供播放时值或改写保留的源文件。"""
+
+from __future__ import annotations
 
 import xml.etree.ElementTree as ET
 from fractions import Fraction as Q
 from pathlib import Path
 
 from pianoscope.score.mapping import layout_input
+from pianoscope.score.model import ScoreDocument
+from pianoscope.score.plan import PlaybackPlan
 from pianoscope.score.source import XML_ID, fail
+from pianoscope.types import PathInput, Record
 
 MEI = "http://www.music-encoding.org/ns/mei"
 TAG = "{" + MEI + "}"
@@ -23,7 +27,13 @@ DUR = {
 }
 
 
-def engraving_input(document, plan, directory):
+def engraving_input(
+    document: ScoreDocument, plan: PlaybackPlan, directory: PathInput
+) -> tuple[str, list[Record]]:
+    """生成供固定版 Verovio 排版的派生 MEI，返回文本及修复清单，并保留工作副本。
+
+    只修复已验证的异时值和弦与反复结尾延音关系；不为播放提供时值，不改变原件。
+    """
     import verovio
 
     toolkit = verovio.toolkit()
