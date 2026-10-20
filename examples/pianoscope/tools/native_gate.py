@@ -114,7 +114,7 @@ def main():
         check(
             "fixed Python 3.10 native environment",
             sys.version_info[:2] == (3, 10)
-            and metadata.version("ultralight-py") == "0.5.0",
+            and metadata.version("ultralight-py") == "0.6.1",
         )
         data = {}
         for name in ("temporal", "printed"):
@@ -296,7 +296,7 @@ def main():
             async def verify():
                 pump = asyncio.create_task(app.run_async(update_interval=1 / 120))
                 try:
-                    # Let the attached 0.5.0 bridge enter the loaded document;
+                    # Let the attached 0.6.1 bridge enter the loaded document;
                     # evaluating against the initial blank document races attach.
                     await asyncio.sleep(0.4)
                     await view.wait_until(
@@ -313,7 +313,7 @@ def main():
                         ),
                         timeout=8,
                     )
-                    snapshot = view.evaluate("Gate.last")
+                    snapshot = view.evaluate("Gate.last", copy=True)
                     check(
                         "DAC snapshot has overlapping independent instances",
                         len(snapshot["active_instance_ids"]) >= 3,
@@ -346,7 +346,8 @@ def main():
                                 + json.dumps(ident)
                                 + ","
                                 + json.dumps(occ)
-                                + ")"
+                                + ")",
+                                copy=True,
                             )
                             await view.wait_until(
                                 lambda: abs(player.audio.position - seconds) < 1e-7,
@@ -396,10 +397,11 @@ def main():
                     check(
                         "no page script error",
                         view.evaluate("Gate.error") is None,
-                        view.evaluate("Gate.error"),
+                        view.evaluate("Gate.error", copy=True),
                     )
                     report["viewport"] = view.evaluate(
-                        "({width:innerWidth,height:innerHeight,dpr:devicePixelRatio})"
+                        "({width:innerWidth,height:innerHeight,dpr:devicePixelRatio})",
+                        copy=True,
                     )
                     report["underruns"] = player.audio.underruns
                 finally:

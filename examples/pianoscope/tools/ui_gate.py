@@ -103,16 +103,26 @@ def main():
                     )
                     await asyncio.sleep(0.2)
                     report["viewport"] = view.evaluate(
-                        "({width:innerWidth,height:innerHeight,dpr:devicePixelRatio})"
+                        "({width:innerWidth,height:innerHeight,dpr:devicePixelRatio})",
+                        copy=True,
                     )
                     report["button_geometry"] = view.evaluate(
-                        """(()=>{const b=document.getElementById('play'),r=b.getBoundingClientRect(),points=[];for(const x of [.1,.5,.9])for(const y of [.15,.5,.85]){const px=r.left+r.width*x,py=r.top+r.height*y,e=document.elementFromPoint(px,py);points.push({x:px,y:py,hit:e?e.tagName+'#'+e.id:null,button:e?e.closest('button')?.id:null})}return {rect:{x:r.x,y:r.y,width:r.width,height:r.height},points}})()"""
+                        """(()=>{const b=document.getElementById('play'),r=b.getBoundingClientRect(),points=[];for(const x of [.1,.5,.9])for(const y of [.15,.5,.85]){const px=r.left+r.width*x,py=r.top+r.height*y,e=document.elementFromPoint(px,py);points.push({x:px,y:py,hit:e?e.tagName+'#'+e.id:null,button:e?e.closest('button')?.id:null})}return {rect:{x:r.x,y:r.y,width:r.width,height:r.height},points}})()""",
+                        copy=True,
                     )
                     capture(view, output / "before.png")
+
+                    async def wait_playing():
+                        # Device startup and the first CPU frame may exceed a fixed sleep.
+                        try:
+                            await view.wait_until(lambda: c.audio.playing, timeout=3)
+                        except TimeoutError:
+                            pass
+
                     for point in report["button_geometry"]["points"]:
                         await view.evaluate_async("piano.pause()")
                         view.click(round(point["x"]), round(point["y"]))
-                        await asyncio.sleep(0.16)
+                        await wait_playing()
                         passed = c.audio.playing
                         report["checks"].append(
                             dict(
@@ -159,7 +169,7 @@ def main():
                                 1.0,
                             )
                             native.sendEvent_(event)
-                        await asyncio.sleep(0.16)
+                        await wait_playing()
                         report["checks"].append(
                             dict(
                                 name="AppKit play hit",
@@ -167,7 +177,7 @@ def main():
                                 status="passed" if c.audio.playing else "failed",
                             )
                         )
-                    report["appkit_events"] = view.evaluate("CLICK_PROBE")
+                    report["appkit_events"] = view.evaluate("CLICK_PROBE", copy=True)
                     await view.evaluate_async("piano.pause()")
                     if not args.probe and not all(
                         x["status"] == "passed" for x in report["checks"]
@@ -191,7 +201,8 @@ def main():
                             geometry = view.evaluate(
                                 """(()=>{const e=document.querySelector(SELECTOR);if(!e||!e.getClientRects().length)return null;e.scrollIntoView({block:'nearest',inline:'nearest'});const r=e.getBoundingClientRect();const x=r.left+r.width/2,y=r.top+r.height/2,hit=document.elementFromPoint(x,y);return {x,y,exposed:hit===e||e.contains(hit)}})()""".replace(
                                     "SELECTOR", json.dumps(selector)
-                                )
+                                ),
+                                copy=True,
                             )
                             if geometry is None:
                                 raise AssertionError("control not visible: " + selector)
@@ -210,7 +221,8 @@ def main():
                             selector = view.evaluate(
                                 """(()=>{const b=Array.from(document.querySelectorAll('#modal button')).find(e=>e.textContent===TEXT&&!e.disabled&&e.getClientRects().length);if(!b)return null;if(!b.id)b.id='ui-action-'+Date.now();return '#'+b.id})()""".replace(
                                     "TEXT", json.dumps(text)
-                                )
+                                ),
+                                copy=True,
                             )
                             if selector is None:
                                 raise AssertionError("button not available: " + text)
@@ -451,7 +463,8 @@ def main():
                                 hit = view.evaluate(
                                     """(()=>{const b=document.getElementById('play'),r=b.getBoundingClientRect(),x=r.left+r.width*EDGE,y=r.top+r.height/2,e=document.elementFromPoint(x,y);return {x,y,hit:e&&e.closest('button')&&e.closest('button').id}})()""".replace(
                                         "EDGE", str(edge)
-                                    )
+                                    ),
+                                    copy=True,
                                 )
                                 check(
                                     "play exposed with " + panel + " " + str(edge),
@@ -490,7 +503,7 @@ def main():
                                 "App.beginMeasure(" + str(args.measure_seconds) + ")"
                             )
                             await asyncio.sleep(args.measure_seconds + 0.1)
-                            measurement = view.evaluate("App.measurement")
+                            measurement = view.evaluate("App.measurement", copy=True)
                             measurement["minimum_fps"] = min(measurement["frames"])
                             report["performance"] = measurement
                             check(
@@ -502,10 +515,10 @@ def main():
                         check(
                             "no script errors",
                             not view.evaluate("APP_ERRORS"),
-                            view.evaluate("APP_ERRORS"),
+                            view.evaluate("APP_ERRORS", copy=True),
                         )
 
-                    report["script_errors"] = view.evaluate("APP_ERRORS")
+                    report["script_errors"] = view.evaluate("APP_ERRORS", copy=True)
                     report["status"] = "probed" if args.probe else "passed"
                 except Exception:
                     report["failure_transport"] = c.get_transport()
@@ -513,7 +526,8 @@ def main():
                         c.get_practice_settings() if c.plan else None
                     )
                     report["failure_page"] = view.evaluate(
-                        '({errors:APP_ERRORS,message:document.getElementById("message").textContent,modal:document.getElementById("modal").hidden,body:document.body.className,clicks:CLICK_PROBE.slice(-20)})'
+                        '({errors:APP_ERRORS,message:document.getElementById("message").textContent,modal:document.getElementById("modal").hidden,body:document.body.className,clicks:CLICK_PROBE.slice(-20)})',
+                        copy=True,
                     )
                     capture(view, output / "failed.png")
                     raise

@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Protocol
+from typing import Any, Coroutine, Protocol
 
 from pianoscope.app.controller import Controller
+from pianoscope.app.data import snapshot_record
+from pianoscope.types import Record
 
 
 class PianoAPI(Protocol):
@@ -21,6 +23,11 @@ def register(api: PianoAPI, controller: Controller) -> None:
 
     api 为 ultralight-py 原生 API 对象；只暴露令牌与结构化记录，不暴露文件路径。
     """
+
+    def configure(changes: Record) -> Coroutine[Any, Any, Record]:
+        """在 JS 调用返回 Promise 前固化配置，避免协程启动前参数已被修改。"""
+        return controller.configure(snapshot_record(changes))
+
     for name in (
         "choose_score",
         "choose_score_folder",
@@ -59,4 +66,4 @@ def register(api: PianoAPI, controller: Controller) -> None:
         "choose_export",
         "begin_export",
     ):
-        api.register(getattr(controller, name))
+        api.register(configure if name == "configure" else getattr(controller, name))

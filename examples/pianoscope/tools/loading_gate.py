@@ -140,7 +140,8 @@ def main():
                     )
                     report["ready_elapsed_s"] = time.monotonic() - started
                     report["viewport"] = view.evaluate(
-                        "({width:innerWidth,height:innerHeight,dpr:devicePixelRatio})"
+                        "({width:innerWidth,height:innerHeight,dpr:devicePixelRatio})",
+                        copy=True,
                     )
                     check(
                         "default roll visible with keyboard",
@@ -198,7 +199,7 @@ def main():
                             "App.beginMeasure(" + str(args.seconds) + ");true"
                         )
                         await asyncio.sleep(args.seconds + 0.15)
-                        metrics = view.evaluate("App.measurement")
+                        metrics = view.evaluate("App.measurement", copy=True)
                         report["performance"] = dict(
                             metrics,
                             minimum_fps=min(metrics["frames"]),
@@ -281,7 +282,8 @@ def main():
                     )
                     report["layout_worker"] = c.active["data"]["worker_metrics"]
                     report["sheet_geometry"] = view.evaluate(
-                        '({scrollY,body:document.body.scrollTop,sheet:document.getElementById("sheet").getBoundingClientRect().y,header:document.querySelector(".top").getBoundingClientRect().y,play:document.getElementById("play").getBoundingClientRect().y})'
+                        '({scrollY,body:document.body.scrollTop,sheet:document.getElementById("sheet").getBoundingClientRect().y,header:document.querySelector(".top").getBoundingClientRect().y,play:document.getElementById("play").getBoundingClientRect().y})',
+                        copy=True,
                     )
                     check(
                         "header and playback controls remain visible",
@@ -358,11 +360,12 @@ def main():
                     check(
                         "no JavaScript errors",
                         not view.evaluate("APP_ERRORS"),
-                        view.evaluate("APP_ERRORS"),
+                        view.evaluate("APP_ERRORS", copy=True),
                     )
                 except Exception:
                     report["state"] = view.evaluate(
-                        "({ready:window.PIANOSCOPE_READY,view:window.App&&App.view,text:document.body.innerText,errors:window.APP_ERRORS})"
+                        "({ready:window.PIANOSCOPE_READY,view:window.App&&App.view,text:document.body.innerText,errors:window.APP_ERRORS})",
+                        copy=True,
                     )
                     report["jobs"] = [c.get_job(j) for j in c.jobs]
                     raise

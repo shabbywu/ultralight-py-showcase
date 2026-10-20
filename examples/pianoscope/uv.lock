@@ -1236,7 +1236,7 @@ requires-dist = [
     { name = "pytest", marker = "extra == 'test'", specifier = "==9.1.1" },
     { name = "ruff", marker = "extra == 'test'", specifier = "==0.15.12" },
     { name = "sounddevice", specifier = "==0.5.6" },
-    { name = "ultralight-py", specifier = "==0.5.0" },
+    { name = "ultralight-py", specifier = "==0.6.1" },
     { name = "verovio", specifier = "==5.6.0" },
 ]
 provides-extras = ["test"]
@@ -1751,28 +1751,28 @@ wheels = [
 
 [[package]]
 name = "ultralight-py"
-version = "0.5.0"
+version = "0.6.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/cf/6b/d07553606c398a3235029ed26108aaa7b04b430dec0c988b1d5c99a0b14f/ultralight_py-0.5.0.tar.gz", hash = "sha256:15e415d0aaf12b866f6b19ba39b336804249759296d896240ea3d680ef57d5a8", size = 10891276, upload-time = "2026-10-14T07:35:02.845Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/01/02/cde84bbf87bdf2c303ba1bb0d5820892cdfc68eb427d20744328b5d2c905/ultralight_py-0.6.1.tar.gz", hash = "sha256:cd2a03153ec9f2895ec8c6443d469eebc3a299ee2f8aad7453de560b91affb1a", size = 10907011, upload-time = "2026-10-20T09:08:17.981Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/84/11/d0a9b355d9771b9d4ca259dae1575e630f8161ea1121fb263921c74be98b/ultralight_py-0.5.0-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:66de58d6994ccfe13ac8bc771aaed8108c6ce5b10717ac199f8c789dd08c5fda", size = 24651300, upload-time = "2026-10-14T07:34:19.515Z" },
-    { url = "https://files.pythonhosted.org/packages/6b/f6/3be2a39a2e8075e8711d9ad38c30a24d61bdfd734742591557a7f3e4feb4/ultralight_py-0.5.0-cp310-cp310-manylinux_2_34_x86_64.whl", hash = "sha256:796c63520534104836e25ce80f2fd9d5b4fa9824d9947e012f72762bd480846a", size = 29292045, upload-time = "2026-10-14T07:34:22.169Z" },
-    { url = "https://files.pythonhosted.org/packages/c9/6d/e418759ab4bb02bf44881880ea9414e5b87bf804a70fcddea2fff963e6a6/ultralight_py-0.5.0-cp310-cp310-win_amd64.whl", hash = "sha256:9fa6a0547c7ee58a827a4a3a6d503cc7d32dc94a32b881d036ae729946a3bad8", size = 25243595, upload-time = "2026-10-14T07:34:24.94Z" },
-    { url = "https://files.pythonhosted.org/packages/a1/27/e704826269cabb6ba65014d922fe32796d49abc065e243da43cca12cd056/ultralight_py-0.5.0-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:66c8e37b8c5037192821d1467d1b2ea2cd476b9e9ceb469f8c2e4a188478cb04", size = 24651742, upload-time = "2026-10-14T07:34:28.883Z" },
-    { url = "https://files.pythonhosted.org/packages/34/13/83859e6a3b4bc68f13c73419fe14663b25b5580ddafc3cb10a376c1cd5de/ultralight_py-0.5.0-cp311-cp311-manylinux_2_34_x86_64.whl", hash = "sha256:b64d144bdc9476dd1fe8848a2ed971a27667431b409863a73be1d69ea7426cb4", size = 29293941, upload-time = "2026-10-14T07:34:31.808Z" },
-    { url = "https://files.pythonhosted.org/packages/63/02/261f0a4cba54f0dbc88841e7b77e3290ce9bb6b3b22a54e29da1ef81f67f/ultralight_py-0.5.0-cp311-cp311-win_amd64.whl", hash = "sha256:104a5e38ec23003a44b0bd70b548b78a4ca656dcfb0fc185bd9d403173a386ae", size = 25243788, upload-time = "2026-10-14T07:34:34.839Z" },
-    { url = "https://files.pythonhosted.org/packages/78/ed/252f7630f50e2dd583dc34f77ac06deb2ce47378e7ae12c59bdade6da8e5/ultralight_py-0.5.0-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:7087c01737fd100f7a3bbab9f2116d6675e576b144f7b5f568bd4f72f7484d0a", size = 24652355, upload-time = "2026-10-14T07:34:37.72Z" },
-    { url = "https://files.pythonhosted.org/packages/6d/db/4188d44a26a8da4376ba445281f58c8b68c480c1516352770e4af4168d82/ultralight_py-0.5.0-cp312-cp312-manylinux_2_34_x86_64.whl", hash = "sha256:f3fab46580cc4093e44e4c0b6e182e847916367e6b750d07a54c3b4c27bb415e", size = 29297593, upload-time = "2026-10-14T07:34:40.408Z" },
-    { url = "https://files.pythonhosted.org/packages/ad/42/0d88ae57e381b3bb50b11faad1e7df5453631af1f5cd7c01bb1b61710204/ultralight_py-0.5.0-cp312-cp312-win_amd64.whl", hash = "sha256:a6ccf2c05afb74bf442633b15c998d4223d65ee8f68dce30c062bf5bde8a82c6", size = 25244628, upload-time = "2026-10-14T07:34:43.283Z" },
-    { url = "https://files.pythonhosted.org/packages/8b/e5/545b7cfbcae040d66ed2ef8d0893263b76ebc86bb09a55e6a1b210eea629/ultralight_py-0.5.0-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:bd50bba8fb0f5cda0c2c1b411d97d9eb4d4d7085937fc8621fa267f3f22812c1", size = 24652411, upload-time = "2026-10-14T07:34:46.038Z" },
-    { url = "https://files.pythonhosted.org/packages/1b/c7/6d672e90d0d59d4483bcdbaca1925a725ef7c9b8733748b2bd96205e3ce8/ultralight_py-0.5.0-cp313-cp313-manylinux_2_34_x86_64.whl", hash = "sha256:1bcf95d2b41a43d7db11dd4bb2b960bf5e9a1edbc9620fd85b8dc45df58155ab", size = 29297578, upload-time = "2026-10-14T07:34:48.903Z" },
-    { url = "https://files.pythonhosted.org/packages/df/a6/7c745eab873e8b461991cde03256792406eb00e3fdb47e31628ba3b770e8/ultralight_py-0.5.0-cp313-cp313-win_amd64.whl", hash = "sha256:36056b3fb92e88304fb0273b9d849d34670ab926a0cf6d276d6c8c148b57d1b4", size = 25244703, upload-time = "2026-10-14T07:34:51.684Z" },
-    { url = "https://files.pythonhosted.org/packages/07/09/2a07cf3b39fdf8b874ed9b21f2fef6262d1df95e55ec01ff5fe95bc3de90/ultralight_py-0.5.0-cp314-cp314-macosx_11_0_arm64.whl", hash = "sha256:26f9e182593f46641d3682ae8190eb1e61206903c93160a108cb2d33537c78dd", size = 24652570, upload-time = "2026-10-14T07:34:54.36Z" },
-    { url = "https://files.pythonhosted.org/packages/9c/80/e32f39131775c9b0dc92d9b4075475b83a6ba82b02e2d28f02993f85454e/ultralight_py-0.5.0-cp314-cp314-manylinux_2_34_x86_64.whl", hash = "sha256:94fe27eff3502429a564adea444917ebfb6b3b23b8b5c0aff5e96dd68a12e18c", size = 29297842, upload-time = "2026-10-14T07:34:57.293Z" },
-    { url = "https://files.pythonhosted.org/packages/d8/e5/1cc6bf328898285e761e2afbd170f5d3927d1c5c354466d6bcf63c174bc5/ultralight_py-0.5.0-cp314-cp314-win_amd64.whl", hash = "sha256:b86fed54d07c2bbf6be04ccd9ecbb945e38f48912774f94f9b689ea4c8861034", size = 25975160, upload-time = "2026-10-14T07:35:00.102Z" },
+    { url = "https://files.pythonhosted.org/packages/01/1b/88e97916625159049c7af7af10e1f9a6f5f19b52b36ecd92040a1609dab2/ultralight_py-0.6.1-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:f41fa04e13c57d84c5a2ba5089b4b1c26d156d083c607bbc61d9c8f1ac3c725e", size = 24663457, upload-time = "2026-10-20T09:07:31.572Z" },
+    { url = "https://files.pythonhosted.org/packages/4e/f9/a5c022c698996f2914c9aac9b5eeaa1448105c937e068972427a1fcef66a/ultralight_py-0.6.1-cp310-cp310-manylinux_2_34_x86_64.whl", hash = "sha256:edace1f0ac6041cd21a042cc8c35620edf9bfb672e9c3f2833b418e8528765fd", size = 29305803, upload-time = "2026-10-20T09:07:34.956Z" },
+    { url = "https://files.pythonhosted.org/packages/67/d2/e2d70db4eb0a70dcfb72004da4a024f66f2cf014beac7086a63ad042fa92/ultralight_py-0.6.1-cp310-cp310-win_amd64.whl", hash = "sha256:9371c25df7f114d3230f0a5655826fc019f074aee565e6d736713512c448a596", size = 25256704, upload-time = "2026-10-20T09:07:38.407Z" },
+    { url = "https://files.pythonhosted.org/packages/ef/25/66f07ddff8dcf30149482dc305818bcbe16a1d6c330c4d652669deb8bb7c/ultralight_py-0.6.1-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:da205a12ded65a40e8b7efd8a7e1e74e3a0791b97f2c9b74189802a298a58ef4", size = 24665418, upload-time = "2026-10-20T09:07:41.304Z" },
+    { url = "https://files.pythonhosted.org/packages/5c/40/323a6c77c7411bf43bcf3639cdd247311d5c7947c59cfbb4171a7753a870/ultralight_py-0.6.1-cp311-cp311-manylinux_2_34_x86_64.whl", hash = "sha256:fa4d47da6ea0be1f42f6f804f90ea2192042c98c20353ed4ebe6ef9d8abf24f7", size = 29307138, upload-time = "2026-10-20T09:07:44.232Z" },
+    { url = "https://files.pythonhosted.org/packages/f5/3d/18773b8d9c78ae4982d6cc22c44145ceb3c4fe8300c6d2bd6fe29e2ab937/ultralight_py-0.6.1-cp311-cp311-win_amd64.whl", hash = "sha256:e5d7dbfea25e96f151b420a4559caa3ef440abdb82bc06db91fd9766f0a84307", size = 25257763, upload-time = "2026-10-20T09:07:47.179Z" },
+    { url = "https://files.pythonhosted.org/packages/40/f0/67f074f205840b26ac89dfd773ee765bff9756817da817e17f9b024b9f44/ultralight_py-0.6.1-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:180ad64af15650568e639b813a48762810287fbcec9c208a7d40c6565f7f2095", size = 24665187, upload-time = "2026-10-20T09:07:50.493Z" },
+    { url = "https://files.pythonhosted.org/packages/3f/f5/cea7a03346ca6d8a567dfa4aa24c5ce980e58069458c46eadccd99e916e3/ultralight_py-0.6.1-cp312-cp312-manylinux_2_34_x86_64.whl", hash = "sha256:5ceafbe93ad81d6755b065b9b691f18b7ce0de341a71aa5a4e69dd5cbb6565d1", size = 29311677, upload-time = "2026-10-20T09:07:53.305Z" },
+    { url = "https://files.pythonhosted.org/packages/80/f7/5f099a8f1922237543c04b879b826ba2e8cb40ddcd3f23940e1c4bc44ea1/ultralight_py-0.6.1-cp312-cp312-win_amd64.whl", hash = "sha256:5f7b7f0a64ddadd13061dd2ee0ead82d1a40ed7e36ab0388a3f2dd8054055807", size = 25258573, upload-time = "2026-10-20T09:07:56.782Z" },
+    { url = "https://files.pythonhosted.org/packages/a8/33/83bba33379f370b5db693f610a5e97f520e4c0b91fe4d8849670623bd6f6/ultralight_py-0.6.1-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:68e23b07f514fb90c03152d62db62a3656d04c54849f42ef49ccb562d38253a9", size = 24665568, upload-time = "2026-10-20T09:07:59.698Z" },
+    { url = "https://files.pythonhosted.org/packages/6d/3c/41db1685310d75d77b932576b6bf1bd93f643ab97467dcb4491f8f1c05f6/ultralight_py-0.6.1-cp313-cp313-manylinux_2_34_x86_64.whl", hash = "sha256:4a8df16c4545c3ef2da08c2201d5f2fdf6880d7c78d229b406194074736e3e39", size = 29311741, upload-time = "2026-10-20T09:08:02.859Z" },
+    { url = "https://files.pythonhosted.org/packages/be/f9/87667a75cc6ce8c7afcb25b7c8b67e21dcb1cf87b620d343f0dce2901f75/ultralight_py-0.6.1-cp313-cp313-win_amd64.whl", hash = "sha256:d1eb146b950b112cedfa725bbb871e290ab31758b7cece9d54cbf58bc94ad0e0", size = 25258576, upload-time = "2026-10-20T09:08:06.099Z" },
+    { url = "https://files.pythonhosted.org/packages/e6/af/14d20662a385e23e018f66e54e5a1eb4a1f793fc7c62f8d50d03df32a258/ultralight_py-0.6.1-cp314-cp314-macosx_11_0_arm64.whl", hash = "sha256:8d5f759401f1950da1652a936664b957af1b44a60da191ed281a1afc6e6885ae", size = 24666184, upload-time = "2026-10-20T09:08:09.279Z" },
+    { url = "https://files.pythonhosted.org/packages/99/ff/99b5cec6a3f2cbd059a118d9b1ccfd6c88450eb82853b7afc56a2fe6f1a5/ultralight_py-0.6.1-cp314-cp314-manylinux_2_34_x86_64.whl", hash = "sha256:966702dcae1ca4f51b2e98c54733297044d197a464b5e6ad7aeb39ff95d3d1be", size = 29312017, upload-time = "2026-10-20T09:08:12.277Z" },
+    { url = "https://files.pythonhosted.org/packages/98/01/be2a7eb66f152406f2841caab390d3ef9ec0c356d632b43f757732771829/ultralight_py-0.6.1-cp314-cp314-win_amd64.whl", hash = "sha256:5204abffa54fe096ec48416d36f505445098ac5010f00829c70c11b75781db38", size = 25987123, upload-time = "2026-10-20T09:08:15.048Z" },
 ]
 
 [[package]]

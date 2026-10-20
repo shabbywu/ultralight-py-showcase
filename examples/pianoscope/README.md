@@ -2,7 +2,7 @@
 
 以 MusicXML 为曲目源的原生钢琴练习播放器。打开乐谱后即可查看下落音符、试听和慢练，也可切换到五线谱跟随阅读，导出 PDF、原文件副本和 MIDI。
 
-应用使用 ultralight-py **0.5.0**、AppCore、本地 HTML/CSS/JavaScript、Canvas 2D 与 `API("piano")`。钢琴声音来自随包 SoundFont，播放与高亮跟随设备 DAC 时钟。资源安装完成后可离线使用，无需 Web 服务、浏览器或在线音源。目前验证平台为 macOS ARM64；其他平台尚未验证。
+应用使用 ultralight-py **0.6.1**、AppCore、本地 HTML/CSS/JavaScript、Canvas 2D 与 `API("piano")`。钢琴声音来自随包 SoundFont，播放与高亮跟随设备 DAC 时钟。资源安装完成后可离线使用，无需 Web 服务、浏览器或在线音源。目前验证平台为 macOS ARM64；其他平台尚未验证。
 
 ![下落音符界面](docs/screenshots/default-roll.png)
 
