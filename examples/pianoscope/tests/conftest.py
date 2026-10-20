@@ -2,8 +2,8 @@
 
 import pytest
 
-from pianoscope.audio import Audio
-from pianoscope.v2_session import Controller
+from pianoscope.app.controller import Controller
+from pianoscope.playback.audio import Audio
 
 
 @pytest.fixture

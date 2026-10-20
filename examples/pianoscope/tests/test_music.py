@@ -3,11 +3,12 @@ from dataclasses import replace
 import mido
 import numpy as np
 import pytest
-from legacy_hands import assigned, preview
+from support.hands import assigned, preview
+from support.midi import ScoreError, parse_midi
 
-from pianoscope.analysis import analyze, fft_amplitude, overview
-from pianoscope.midi import Note, Score, ScoreError, parse_midi
-from pianoscope.render import render
+from pianoscope.playback.analysis import analyze, fft_amplitude, overview
+from pianoscope.playback.model import Note, Score
+from pianoscope.playback.render import render
 
 
 def midi(tmp_path, tracks, type=1, ppqn=480):

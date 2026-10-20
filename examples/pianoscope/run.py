@@ -10,9 +10,9 @@ import traceback
 from importlib.metadata import version
 from pathlib import Path
 
-from pianoscope.dialogs import before_window_close
-from pianoscope.v2_bridge import register
-from pianoscope.v2_session import Controller
+from pianoscope.app.bridge import register
+from pianoscope.app.controller import Controller
+from pianoscope.app.dialogs import before_window_close
 
 ROOT = Path(__file__).resolve().parent
 # Poll AppCore frequently enough to service native display/input callbacks.
@@ -71,7 +71,6 @@ def main():
             + ";"
         )
         resources["config.js"] = Resource(config.encode(), "text/javascript")
-        resources["index.html"] = resources["v2.html"]
 
         def resource_loader(name):
             if name in resources:
@@ -80,7 +79,7 @@ def main():
             return Resource(data, "image/png") if data is not None else None
 
         with (
-            tempfile.TemporaryDirectory(prefix="pianoscope-v2-") as cache,
+            tempfile.TemporaryDirectory(prefix="pianoscope-") as cache,
             API("piano") as api,
             Application(
                 assets_root=str(assets),
@@ -102,7 +101,7 @@ def main():
                         app.run_async(update_interval=APP_UPDATE_INTERVAL)
                     )
                     try:
-                        from pianoscope.v2_checks import verify
+                        from tools.smoke import verify
 
                         await verify(window.view, controller, args, report)
                     except Exception:
@@ -140,7 +139,7 @@ def main():
                 json.dumps(report, ensure_ascii=False, indent=2, default=str)
             )
         if args.smoke:
-            print("PianoScope v2 native: " + report["status"], flush=True)
+            print("PianoScope native: " + report["status"], flush=True)
 
 
 if __name__ == "__main__":

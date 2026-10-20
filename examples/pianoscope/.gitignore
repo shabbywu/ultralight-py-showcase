@@ -17,15 +17,13 @@ dist/
 !/docs/samples/
 
 /docs/screenshots/*
-!/docs/screenshots/v2-default-roll.png
-!/docs/screenshots/v2-lazy-sheet.png
-!/docs/screenshots/v2-audition-800.png
-!/docs/screenshots/v2-hands-800.png
-!/docs/screenshots/v2-roll-trails-animated.png
+!/docs/screenshots/default-roll.png
+!/docs/screenshots/lazy-sheet.png
+!/docs/screenshots/audition-800.png
+!/docs/screenshots/hands-800.png
+!/docs/screenshots/roll-trails-animated.png
 
 /docs/samples/*
-!/docs/samples/v2/
-/docs/samples/v2/*
-!/docs/samples/v2/first-light.pdf
-!/docs/samples/v2/first-light.musicxml
-!/docs/samples/v2/first-light.mid
+!/docs/samples/first-light.pdf
+!/docs/samples/first-light.musicxml
+!/docs/samples/first-light.mid

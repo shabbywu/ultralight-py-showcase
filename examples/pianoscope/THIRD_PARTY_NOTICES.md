@@ -12,7 +12,7 @@
 
 ## 曲目、截图与字体
 
-本项目的原创乐谱、MIDI 测试夹具及其派生 PDF／MIDI 和界面截图采用本项目 MIT 许可，个人乐谱不随仓库分发。内置“初光”和“回环与晨光”由 [generate_v2_fixtures.py](tools/generate_v2_fixtures.py) 直接编写 MusicXML；其他 XML 测试夹具同样为直接创作的源乐谱。
+本项目的原创乐谱、MIDI 测试夹具及其派生 PDF／MIDI 和界面截图采用本项目 MIT 许可，个人乐谱不随仓库分发。内置“初光”和“回环与晨光”由 [generate_fixtures.py](tools/generate_fixtures.py) 直接编写 MusicXML；其他 XML 测试夹具同样为直接创作的源乐谱。
 
 `docs/screenshots/` 中的正式图片来自真实 AppCore CPU View，使用本项目原创曲与随包音源，未使用生成式图片。
 
@@ -52,6 +52,6 @@ Python 包的原始许可随其发行包保留，具体依赖与哈希见 `uv.lo
 
 精确 Python 包及传递依赖、wheel URL 和 SHA-256 由 `uv.lock` 固定。music21 和 PyMuPDF 仅用于测试，不参与产品播放。所有音乐字形、中文字体和音源在安装后本地可用，无运行时下载。
 
-`score_process.py`／`v2_worker.py` 用独立 Python 子进程运行 Verovio／CairoSVG，避免字体／原生库状态影响 AppCore 和音频回调。macOS Cairo 的库定位只在该子进程中临时补充 Homebrew 路径，不修改主进程动态库搜索。SVG 中的文字全部转换为本地字体路径，避免 CairoSVG 忽略网页字体导致的速度音符缺字；相同 SVG 输出 Canvas 底图和黑白 PDF。多页 PDF 用 pypdf 合并，实测页面为 595.2756 × 841.8898 pt（A4）。
+`score/process.py`／`score/worker.py` 用独立 Python 子进程运行 Verovio／CairoSVG，避免字体／原生库状态影响 AppCore 和音频回调。macOS Cairo 的库定位只在该子进程中临时补充 Homebrew 路径，不修改主进程动态库搜索。SVG 中的文字全部转换为本地字体路径，避免 CairoSVG 忽略网页字体导致的速度音符缺字；相同 SVG 输出 Canvas 底图和黑白 PDF。多页 PDF 用 pypdf 合并，实测页面为 595.2756 × 841.8898 pt（A4）。
 
 新增源码和原创验证 MIDI 继续采用本目录 MIT；各依赖保留其自己的许可。未制作发行包。

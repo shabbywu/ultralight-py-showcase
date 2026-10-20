@@ -4,7 +4,7 @@
 
 应用使用 ultralight-py **0.5.0**、AppCore、本地 HTML/CSS/JavaScript、Canvas 2D 与 `API("piano")`。钢琴声音来自随包 SoundFont，播放与高亮跟随设备 DAC 时钟。资源安装完成后可离线使用，无需 Web 服务、浏览器或在线音源。目前验证平台为 macOS ARM64；其他平台尚未验证。
 
-![下落音符界面](docs/screenshots/v2-default-roll.png)
+![下落音符界面](docs/screenshots/default-roll.png)
 
 ## 安装与运行
 
@@ -31,16 +31,16 @@ Python 依赖及下载哈希由 `uv.lock` 固定。内置 SoundFont、中文字�
 
 默认显示下落音符。首次打开先准备播放数据与声音，等待手动播放；五线谱在点击“五线谱”后按需排版，成功后复用。排版期间可以继续播放；取消或失败可返回下落视图或重试。加载新曲失败会保留当前曲目。
 
-五线谱可缩放 100／125／150%，点击符头、休止或小节定位。有反复时可选择遍次；延音线后段仍对应同一次起音。滚轮、触摸或翻页暂停自动跟随，“回到当前”恢复。[五线谱界面](docs/screenshots/v2-lazy-sheet.png)。
+五线谱可缩放 100／125／150%，点击符头、休止或小节定位。有反复时可选择遍次；延音线后段仍对应同一次起音。滚轮、触摸或翻页暂停自动跟随，“回到当前”恢复。[五线谱界面](docs/screenshots/lazy-sheet.png)。
 
-下落音符的同键连续起音留有短间隔，延音线连接的持续音保持整条。按住期间有持续溅起的粒子尾迹，松键后淡出；顶部“触键光效”可关闭，系统“减少动态效果”会停止移动粒子。[触键尾迹动画](docs/screenshots/v2-roll-trails-animated.png)。触键线可上移 0–60%。
+下落音符的同键连续起音留有短间隔，延音线连接的持续音保持整条。按住期间有持续溅起的粒子尾迹，松键后淡出；顶部“触键光效”可关闭，系统“减少动态效果”会停止移动粒子。[触键尾迹动画](docs/screenshots/roll-trails-animated.png)。触键线可上移 0–60%。
 
 ## 播放与练习
 
 - 速度支持 0.5×／0.75×／1×，慢速保持音高。
 - 点击声音概览定位，拖动 A／B 或输入时间设置片段循环；区间至少 0.5 秒。停止回曲首并保留区间，下一次播放从 A 点开始。
-- “试听范围”可选全部、上谱表、下谱表或静音，也可按声部筛选；重新打开保留已应用的选择，取消不改变声音。[试听范围界面](docs/screenshots/v2-audition-800.png)。
-- “左右手设置”按谱表给出初始建议，确认后才生效，可撤销。未确认前不会将上下谱表直接当作左右手。侧栏“双手｜左手｜右手”可切换试听。[左右手界面](docs/screenshots/v2-hands-800.png)。
+- “试听范围”可选全部、上谱表、下谱表或静音，也可按声部筛选；重新打开保留已应用的选择，取消不改变声音。[试听范围界面](docs/screenshots/audition-800.png)。
+- “左右手设置”按谱表给出初始建议，确认后才生效，可撤销。未确认前不会将上下谱表直接当作左右手。侧栏“双手｜左手｜右手”可切换试听。[左右手界面](docs/screenshots/hands-800.png)。
 - 仅改变标签或等效试听设置时复用声音缓冲，保持播放位置；需要改变实际声音时，先准备候选再替换。试听和手别不修改原乐谱及默认全曲 MIDI。
 - 可显示完整 88 键或曲目音域，展开声音波形和频谱。琴键点击仅显示音高信息，不作为演奏输入。
 
@@ -52,7 +52,7 @@ Python 依赖及下载哈希由 `uv.lock` 固定。内置 SoundFont、中文字�
 
 保存取消或失败保留已有目标，禁止覆盖当前输入源文件。保存开始后即使换曲，也按已选曲目的快照完成导出。
 
-原创“初光”示例：[两页 PDF](docs/samples/v2/first-light.pdf)、[MusicXML](docs/samples/v2/first-light.musicxml)、[MIDI](docs/samples/v2/first-light.mid)。示例乐谱及对应截图采用本项目 MIT 许可。
+原创“初光”示例：[两页 PDF](docs/samples/first-light.pdf)、[MusicXML](docs/samples/first-light.musicxml)、[MIDI](docs/samples/first-light.mid)。示例乐谱及对应截图采用本项目 MIT 许可。
 
 ## 支持范围与限制
 
@@ -71,6 +71,14 @@ grace、D.C./D.S./Fine/Coda 导航、嵌套反复、微分音、非零移调、�
 当前不提供演奏输入、麦克风、评分、完整制谱编辑器或发行安装包。尚未系统验证人工耳听、物理声画延迟、设备拔插和其他操作系统。
 
 ## 测试与本地文件
+
+Python 模块按职责组织：
+
+- `pianoscope/score/`：MusicXML 源文件、语义模型、播放计划、MIDI 编译、谱面排版及隔离进程。
+- `pianoscope/playback/`：播放事件模型、SoundFont 合成、PCM 缓冲、设备 DAC 时钟与声音分析。
+- `pianoscope/app/`：曲目与导出事务、原生对话框、`API("piano")` 桥接。
+- `pianoscope/assets/`、`pianoscope/resources/`：本地前端与随包资源；资源位置由 `pianoscope/paths.py` 统一定位。
+- `tests/`：自动化回归及 `fixtures/musicxml/` 源乐谱；`tools/`：原生验收与资源生成工具。
 
 ```sh
 uv run --extra test python -m ruff format --no-cache --check .

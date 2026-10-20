@@ -2,7 +2,7 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from pianoscope.audio import Audio
+from pianoscope.playback.audio import Audio
 
 
 class Stream:
