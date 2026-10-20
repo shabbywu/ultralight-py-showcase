@@ -44,8 +44,8 @@ def main():
         pass
 
     try:
-        if version("ultralight-py") != "0.5.0":
-            raise RuntimeError("需要 ultralight-py==0.5.0")
+        if version("ultralight-py") != "0.6.1":
+            raise RuntimeError("需要 ultralight-py==0.6.1")
         from ultralight_py import API, Application, Resource
 
         controller = Controller()
@@ -107,7 +107,8 @@ def main():
                     except Exception:
                         try:
                             report["page_state"] = window.view.evaluate(
-                                "({errors:window.APP_ERRORS,text:document.body.innerText,ready:window.PIANOSCOPE_READY})"
+                                "({errors:window.APP_ERRORS,text:document.body.innerText,ready:window.PIANOSCOPE_READY})",
+                                copy=True,
                             )
                         except Exception:
                             pass

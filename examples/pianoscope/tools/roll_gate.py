@@ -191,7 +191,8 @@ def main():
                         timeout=40,
                     )
                     report["viewport"] = view.evaluate(
-                        "({width:innerWidth,height:innerHeight,dpr:devicePixelRatio})"
+                        "({width:innerWidth,height:innerHeight,dpr:devicePixelRatio})",
+                        copy=True,
                     )
                     check("actual output device ready", c.audio.ready, c.audio.error)
                     check(
@@ -218,7 +219,7 @@ def main():
                         'App.setView("roll");document.getElementById("lift").value="35";document.getElementById("lift").dispatchEvent(new Event("input"));true'
                     )
                     await asyncio.sleep(0.15)
-                    cells = view.evaluate("App.rollDiagnostics.cells")
+                    cells = view.evaluate("App.rollDiagnostics.cells", copy=True)
                     repeat = [r for r in cells if r["pitch"] == 72]
                     held = [r for r in cells if r["pitch"] == 48]
                     check(
@@ -228,7 +229,8 @@ def main():
                         repeat,
                     )
                     full = view.evaluate(
-                        "(()=>{const p=new PianoRollRenderer({},true);p.setNotes(App.notes,App.document.playback_revision);return p.geometry(new KeyboardLayout([48,72],'focused',800),0,600,600,85)})()"
+                        "(()=>{const p=new PianoRollRenderer({},true);p.setNotes(App.notes,App.document.playback_revision);return p.geometry(new KeyboardLayout([48,72],'focused',800),0,600,600,85)})()",
+                        copy=True,
                     )
                     all_repeat = [r for r in full if r["pitch"] == 72]
                     check(
@@ -239,7 +241,7 @@ def main():
                         all_repeat,
                     )
                     source_notes = {n["id"]: n for n in c.plan.instances}
-                    line = view.evaluate("App.rollDiagnostics.line")
+                    line = view.evaluate("App.rollDiagnostics.line", copy=True)
                     check(
                         "leading edges and audible durations unchanged",
                         all(
@@ -260,7 +262,8 @@ def main():
                         held,
                     )
                     geometry_edges = view.evaluate(
-                        """(()=>{const p=new PianoRollRenderer({},true),n=(id,on,off,pitch)=>({id,pitch,onset_s:on,key_off_s:off,hand:'unassigned'}),notes=[n('held',0,2,60),n('overlap',1,1.5,60),n('tiny1',0,.01,62),n('tiny2',.01,.02,62),n('rest1',0,.5,64),n('rest2',1,2,64)];p.setNotes(notes,'r');const cells=p.geometry(new KeyboardLayout([60,62,64],'focused',800),0,600,600,85);return {overlap:cells.filter(c=>c.pitch===60).every(c=>c.gap===0),tiny:cells.filter(c=>c.pitch===62).every(c=>c.height>=1&&c.gap<=.375),rest:cells.filter(c=>c.pitch===64).every(c=>c.gap===0),notesUntouched:notes[2].key_off_s===.01}})()"""
+                        """(()=>{const p=new PianoRollRenderer({},true),n=(id,on,off,pitch)=>({id,pitch,onset_s:on,key_off_s:off,hand:'unassigned'}),notes=[n('held',0,2,60),n('overlap',1,1.5,60),n('tiny1',0,.01,62),n('tiny2',.01,.02,62),n('rest1',0,.5,64),n('rest2',1,2,64)];p.setNotes(notes,'r');const cells=p.geometry(new KeyboardLayout([60,62,64],'focused',800),0,600,600,85);return {overlap:cells.filter(c=>c.pitch===60).every(c=>c.gap===0),tiny:cells.filter(c=>c.pitch===62).every(c=>c.height>=1&&c.gap<=.375),rest:cells.filter(c=>c.pitch===64).every(c=>c.gap===0),notesUntouched:notes[2].key_off_s===.01}})()""",
+                        copy=True,
                     )
                     check(
                         "overlapping voices, short attacks and natural rests preserved",
@@ -278,7 +281,7 @@ def main():
                         timeout=4,
                     )
                     await asyncio.sleep(0.11)
-                    fx = view.evaluate("App.rollDiagnostics")
+                    fx = view.evaluate("App.rollDiagnostics", copy=True)
                     report["strike_sample"] = fx
                     check(
                         "DAC attacks create bounded real Canvas trails",
@@ -287,7 +290,8 @@ def main():
                         fx,
                     )
                     key_widths = view.evaluate(
-                        'Array.from(document.querySelectorAll("#keys .key")).map(k=>({pitch:Number(k.dataset.pitch),width:k.getBoundingClientRect().width}))'
+                        'Array.from(document.querySelectorAll("#keys .key")).map(k=>({pitch:Number(k.dataset.pitch),width:k.getBoundingClientRect().width}))',
+                        copy=True,
                     )
                     widths = {k["pitch"]: k["width"] for k in key_widths}
                     check(
@@ -318,7 +322,7 @@ def main():
                             "App.rollDiagnostics.particles===0&&App.rollDiagnostics.pulses===0&&App.rollDiagnostics.emitters.length===0"
                         ),
                     )
-                    before = view.evaluate("App.rollDiagnostics.impacts")
+                    before = view.evaluate("App.rollDiagnostics.impacts", copy=True)
                     await view.evaluate_async("piano.seek(2.5)")
                     await view.evaluate_async("piano.play()")
                     await asyncio.sleep(0.25)
@@ -326,9 +330,9 @@ def main():
                         "seek/resume inside a held note creates no false attack",
                         view.evaluate("App.rollDiagnostics.impacts") == before,
                     )
-                    held_a = view.evaluate("App.rollDiagnostics.trails")
+                    held_a = view.evaluate("App.rollDiagnostics.trails", copy=True)
                     await asyncio.sleep(0.09)
-                    held_b = view.evaluate("App.rollDiagnostics")
+                    held_b = view.evaluate("App.rollDiagnostics", copy=True)
                     previous = {p["id"]: p for p in held_a}
                     check(
                         "held notes continuously emit moving curved trails without new attacks",
@@ -354,7 +358,9 @@ def main():
                                 dict(
                                     path=frame.name,
                                     wall_s=time.monotonic(),
-                                    transport=view.evaluate("App.transport.position_s"),
+                                    transport=view.evaluate(
+                                        "App.transport.position_s", copy=True
+                                    ),
                                 )
                             )
                             screenshot(view, frame)
@@ -370,7 +376,7 @@ def main():
                         ),
                         timeout=2,
                     )
-                    released = view.evaluate("App.rollDiagnostics")
+                    released = view.evaluate("App.rollDiagnostics", copy=True)
                     check(
                         "real key release stops emission while airborne trails continue",
                         not any(e["pitch"] == 72 for e in released["emitters"])
@@ -396,7 +402,7 @@ def main():
                         ),
                         timeout=3,
                     )
-                    before = view.evaluate("App.rollDiagnostics.impacts")
+                    before = view.evaluate("App.rollDiagnostics.impacts", copy=True)
                     await view.evaluate_async("piano.play()")
                     await asyncio.sleep(0.18)
                     check(
@@ -408,7 +414,8 @@ def main():
                     # Production state machine, isolated from the active renderer.
                     # These manually authored snapshots test short-frame/reset boundaries.
                     rules = view.evaluate(
-                        """(()=>{const p=new PianoRollRenderer({unassigned:'#aaa'},true),n={id:'n',pitch:60,onset_s:1,key_off_s:2,hand:'unassigned'};p.setNotes([n],'r');const s=(seq,pos,epoch=1)=>({seq,position_s:pos,clock_epoch:epoch,playback_revision:'r',phase:'playing',volume:1,rate:1,loop:{enabled:true,a_s:1,b_s:2},active_instance_ids:['n'],sustained_instance_ids:[]});p.observe(s(1,.95),true,0);p.observe(s(2,1.01),true,60);p.observe(s(2,1.01),true,70);const once=p.impactCount;p.observe(s(3,1.5,2),true,80);const seek=p.impactCount;p.observe(s(4,1.95,2),true,100);p.observe(s(5,1.02,2),true,160);const loop=p.impactCount;p.setEnabled(false);const cleared=!p.particles.length&&!p.pulses.length;p.reducedMotion=true;p.setEnabled(true);p.reset();p.observe(s(6,.95),true,180);p.observe(s(7,1.01),true,240);return {once,seek,loop,cleared,reducedParticles:p.particles.length,reducedPulses:p.pulses.length}})()"""
+                        """(()=>{const p=new PianoRollRenderer({unassigned:'#aaa'},true),n={id:'n',pitch:60,onset_s:1,key_off_s:2,hand:'unassigned'};p.setNotes([n],'r');const s=(seq,pos,epoch=1)=>({seq,position_s:pos,clock_epoch:epoch,playback_revision:'r',phase:'playing',volume:1,rate:1,loop:{enabled:true,a_s:1,b_s:2},active_instance_ids:['n'],sustained_instance_ids:[]});p.observe(s(1,.95),true,0);p.observe(s(2,1.01),true,60);p.observe(s(2,1.01),true,70);const once=p.impactCount;p.observe(s(3,1.5,2),true,80);const seek=p.impactCount;p.observe(s(4,1.95,2),true,100);p.observe(s(5,1.02,2),true,160);const loop=p.impactCount;p.setEnabled(false);const cleared=!p.particles.length&&!p.pulses.length;p.reducedMotion=true;p.setEnabled(true);p.reset();p.observe(s(6,.95),true,180);p.observe(s(7,1.01),true,240);return {once,seek,loop,cleared,reducedParticles:p.particles.length,reducedPulses:p.pulses.length}})()""",
+                        copy=True,
                     )
                     check(
                         "same snapshot once, seek reset, valid loop re-strike",
@@ -426,7 +433,8 @@ def main():
                     )
                     # Exercise the real visible effect switch, not just a JS setter.
                     rect = view.evaluate(
-                        '(()=>{const r=document.getElementById("rollEffects").getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2}})()'
+                        '(()=>{const r=document.getElementById("rollEffects").getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2}})()',
+                        copy=True,
                     )
                     view.click(round(rect["x"]), round(rect["y"]))
                     await asyncio.sleep(0.1)
@@ -447,14 +455,14 @@ def main():
                         view.click(round(rect["x"]), round(rect["y"]))
                         await asyncio.sleep(0.1)
                     report["effects_enabled"] = view.evaluate(
-                        "App.rollDiagnostics.enabled"
+                        "App.rollDiagnostics.enabled", copy=True
                     )
                     # Allow the actual loop editor resize and audio start to settle.
                     await asyncio.sleep(0.25)
                     report["measurement_warmup_s"] = 0.25
                     view.evaluate("App.beginMeasure(" + str(args.seconds) + ")")
                     await asyncio.sleep(args.seconds + 0.1)
-                    performance = view.evaluate("App.measurement")
+                    performance = view.evaluate("App.measurement", copy=True)
                     performance["minimum_fps"] = min(performance["frames"])
                     report["performance"] = performance
                     check(
@@ -479,13 +487,14 @@ def main():
                     check(
                         "no script errors",
                         not view.evaluate("APP_ERRORS"),
-                        view.evaluate("APP_ERRORS"),
+                        view.evaluate("APP_ERRORS", copy=True),
                     )
                     report["status"] = "passed"
                 except Exception:
                     report["page"] = json.loads(
                         view.evaluate(
-                            "JSON.stringify({errors:window.APP_ERRORS||[],text:document.body.innerText,roll:window.App?App.rollDiagnostics:null})"
+                            "JSON.stringify({errors:window.APP_ERRORS||[],text:document.body.innerText,roll:window.App?App.rollDiagnostics:null})",
+                            copy=True,
                         )
                     )
                     if not args.gpu:

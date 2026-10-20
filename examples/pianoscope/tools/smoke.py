@@ -28,7 +28,7 @@ async def verify(view, c, args, report):
             raise AssertionError(name + ": " + str(detail))
 
     async def call(source):
-        return await view.evaluate_async(source)
+        return await view.evaluate_async(source, copy=True)
 
     await asyncio.sleep(0.4)
     await view.wait_until(
@@ -38,11 +38,11 @@ async def verify(view, c, args, report):
         timeout=60,
     )
     check("real MusicXML document published", c.plan is not None)
-    check("fixed native binding", version("ultralight-py") == "0.5.0")
+    check("fixed native binding", version("ultralight-py") == "0.6.1")
     check(
         "no JavaScript errors",
         not view.evaluate("APP_ERRORS"),
-        view.evaluate("APP_ERRORS"),
+        view.evaluate("APP_ERRORS", copy=True),
     )
     check(
         "default roll is ready without engraving",
@@ -67,7 +67,8 @@ async def verify(view, c, args, report):
             ),
         )
     report["viewport"] = view.evaluate(
-        "({css_width:innerWidth,css_height:innerHeight,dpr:devicePixelRatio,canvas_backing_ratio:CPU_RENDERER?1:Math.min(2,devicePixelRatio)})"
+        "({css_width:innerWidth,css_height:innerHeight,dpr:devicePixelRatio,canvas_backing_ratio:CPU_RENDERER?1:Math.min(2,devicePixelRatio)})",
+        copy=True,
     )
     if platform.system() == "Darwin":
         from AppKit import NSApplication
@@ -146,7 +147,7 @@ async def verify(view, c, args, report):
         script = """(()=>{const id=IDENT,row=App.rows.find(r=>r.page.glyphs.some(g=>g.element_id===id)),g=row.page.glyphs.find(g=>g.element_id===id),r=row.canvas.getBoundingClientRect(),x=r.left+(g.bbox[0]+g.bbox[2]/2)*row.scale,y=r.top+(g.bbox[1]+g.bbox[3]/2-row.top)*row.scale;row.canvas.dispatchEvent(new MouseEvent('click',{clientX:x,clientY:y}));return {error:Math.max(Math.abs((x-r.left)/row.scale-(g.bbox[0]+g.bbox[2]/2)),Math.abs((y-r.top)/row.scale+row.top-(g.bbox[1]+g.bbox[3]/2)))*row.scale}})()""".replace(
             "IDENT", json.dumps(target.id)
         )
-        geometry = view.evaluate(script)
+        geometry = view.evaluate(script, copy=True)
         await view.wait_until(
             lambda: abs(c.audio.position - expected) < 1e-7, timeout=5
         )
@@ -157,7 +158,8 @@ async def verify(view, c, args, report):
     for mode, expected_count in (("full", 88), ("focused", None)):
         view.evaluate("document.getElementById(" + json.dumps(mode) + ").click();true")
         keys = view.evaluate(
-            '({count:document.querySelectorAll("#keys .key").length,white:document.querySelectorAll("#keys .white").length,black:document.querySelectorAll("#keys .black").length})'
+            '({count:document.querySelectorAll("#keys .key").length,white:document.querySelectorAll("#keys .white").length,black:document.querySelectorAll("#keys .black").length})',
+            copy=True,
         )
         check(
             "keyboard " + mode,
@@ -187,7 +189,9 @@ async def verify(view, c, args, report):
             ),
             timeout=5,
         )
-        paint = view.evaluate("({paint:App.lastPaint,transport:App.transport})")
+        paint = view.evaluate(
+            "({paint:App.lastPaint,transport:App.transport})", copy=True
+        )
         check(
             "same DAC snapshot IDs actually painted",
             set(paint["paint"]["ids"]) == set(paint["transport"]["active_element_ids"]),
@@ -336,7 +340,9 @@ async def verify(view, c, args, report):
         check(
             "loop endpoints display occurrence labels",
             True,
-            view.evaluate('document.getElementById("loopVisits").textContent'),
+            view.evaluate(
+                'document.getElementById("loopVisits").textContent', copy=True
+            ),
         )
         wraps = 0
         previous = c.get_transport()["position_s"]
@@ -510,7 +516,7 @@ async def verify(view, c, args, report):
         wall = time.monotonic()
         view.evaluate("App.beginMeasure(" + str(args.measure_seconds) + ")")
         await asyncio.sleep(args.measure_seconds + 0.15)
-        metrics = view.evaluate("App.measurement")
+        metrics = view.evaluate("App.measurement", copy=True)
         metrics["cpu_percent"] = (
             100 * (time.process_time() - cpu) / (time.monotonic() - wall)
         )
@@ -523,7 +529,7 @@ async def verify(view, c, args, report):
         metrics["page_changes_included"] = True
         metrics["underruns"] = c.audio.underruns
         report["performance"] = metrics
-        metrics["last_paint_snapshot"] = view.evaluate("App.lastPaint")
+        metrics["last_paint_snapshot"] = view.evaluate("App.lastPaint", copy=True)
         check(
             "every complete wall-clock window >=30 actual frames",
             len(metrics["frames"]) == int(args.measure_seconds)
@@ -545,5 +551,5 @@ async def verify(view, c, args, report):
     check(
         "no final script errors",
         not view.evaluate("APP_ERRORS"),
-        view.evaluate("APP_ERRORS"),
+        view.evaluate("APP_ERRORS", copy=True),
     )

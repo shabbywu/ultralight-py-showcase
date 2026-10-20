@@ -138,7 +138,8 @@ def main():
                     point = view.evaluate(
                         """(()=>{const e=document.querySelector(SELECTOR);if(!e)return null;const r=e.getBoundingClientRect(),x=r.left+r.width/2,y=r.top+r.height/2,h=document.elementFromPoint(x,y);return {x,y,visible:r.width>0&&r.height>0&&(h===e||e.contains(h))}})()""".replace(
                             "SELECTOR", json.dumps(selector)
-                        )
+                        ),
+                        copy=True,
                     )
                     if not point or not point["visible"]:
                         raise AssertionError("control not exposed: " + selector)
@@ -164,7 +165,8 @@ def main():
                     selector = view.evaluate(
                         """(()=>{const b=Array.from(document.querySelectorAll('#modal button')).find(b=>b.textContent===TEXT&&!b.disabled);if(!b)return null;b.id='memory-action';return '#memory-action'})()""".replace(
                             "TEXT", json.dumps(text)
-                        )
+                        ),
+                        copy=True,
                     )
                     if selector is None:
                         raise AssertionError("action unavailable: " + text)
@@ -342,14 +344,14 @@ def main():
                     check(
                         "no script errors",
                         not view.evaluate("APP_ERRORS"),
-                        view.evaluate("APP_ERRORS"),
+                        view.evaluate("APP_ERRORS", copy=True),
                     )
                     await view.evaluate_async("piano.pause()")
                     await asyncio.sleep(0.15)
                     screenshot(view, out / "after-assignment-and-slow-audition.png")
                 except Exception:
                     report["page"] = view.evaluate(
-                        "({text:document.body.innerText,errors:APP_ERRORS})"
+                        "({text:document.body.innerText,errors:APP_ERRORS})", copy=True
                     )
                     raise
                 finally:

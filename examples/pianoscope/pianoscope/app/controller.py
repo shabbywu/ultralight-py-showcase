@@ -16,6 +16,7 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager, contextmanager
 from pathlib import Path
 
+from pianoscope.app.data import snapshot_record
 from pianoscope.app.dialogs import choose_path, choose_score_path
 from pianoscope.paths import RESOURCES, work_root
 from pianoscope.playback.analysis import analyze, overview
@@ -140,6 +141,7 @@ class Controller(ScorePlayer):
 
         确认后沿用不可变源快照；后台工作不替换当前曲目，只有应用线程可原子提交。
         """
+        settings = snapshot_record(settings)
         if self.closed:
             raise ValueError("应用已关闭")
         if self.current_job:
@@ -165,7 +167,7 @@ class Controller(ScorePlayer):
             lock=threading.Lock(),
             folder=folder,
             source_path=path,
-            settings=copy.deepcopy(settings),
+            settings=settings,
         )
         self.jobs[jid] = job
         self.current_job = jid
@@ -775,7 +777,7 @@ class Controller(ScorePlayer):
             raise ValueError("请先打开乐谱")
         if self.current_job and not self.jobs[self.current_job]["done"]:
             raise ValueError("请先完成或取消乐谱准备，再更改试听")
-        changes = dict(changes)
+        changes = snapshot_record(changes)
         if any(
             k not in ("rate", "hand_mode", "staff_ids", "voice_ids") for k in changes
         ):

@@ -22,7 +22,7 @@
 
 | 组件 | 本机验证版本 | 许可／来源 |
 | --- | --- | --- |
-| ultralight-py | 0.5.0 | [项目源码与许可](https://github.com/shabbywu/ultralight-py)；Ultralight 原生 SDK 另受其 [官方条款](https://ultralig.ht/license/) 约束 |
+| ultralight-py | 0.6.1 | [项目源码与许可](https://github.com/shabbywu/ultralight-py)；Ultralight 原生 SDK 另受其 [官方条款](https://ultralig.ht/license/) 约束 |
 | FluidSynth | 2.6.1 | [LGPL-2.1-or-later](https://github.com/FluidSynth/fluidsynth/blob/master/LICENSE)；通过系统动态库加载，不随本项目复制库文件 |
 | PortAudio | 19.7.0 | [MIT 风格许可](https://www.portaudio.com/license.html)，由 sounddevice 使用 |
 | sounddevice | 0.5.6 | [MIT](https://github.com/spatialaudio/python-sounddevice/blob/master/LICENSE) |
