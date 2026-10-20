@@ -1,5 +1,6 @@
 """Regression checks for locale completeness, safe output and real demo media."""
 
+import hashlib
 import json
 import shutil
 import tempfile
@@ -52,6 +53,25 @@ class BuildTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "identical keys"):
             build_site.build(source, output)
         self.assertEqual((output / "keep.txt").read_text(), "previous build")
+
+    def test_changed_styles_invalidate_cached_assets_on_every_page(self):
+        source = self.source_copy()
+        output = self.root / "dist"
+        build_site.build(source, output)
+        before = hashlib.sha256((source / "assets/style.css").read_bytes()).hexdigest()[
+            :12
+        ]
+        for page in output.rglob("*.html"):
+            self.assertIn(f"style.css?v={before}", page.read_text())
+            self.assertRegex(page.read_text(), r"app\.js\?v=[0-9a-f]{12}")
+        css = source / "assets/style.css"
+        css.write_text(css.read_text() + "\n/* updated style */\n")
+        build_site.build(source, output)
+        after = hashlib.sha256(css.read_bytes()).hexdigest()[:12]
+        self.assertNotEqual(before, after)
+        for page in output.rglob("*.html"):
+            self.assertIn(f"style.css?v={after}", page.read_text())
+            self.assertNotIn(f"style.css?v={before}", page.read_text())
 
     def test_translation_placeholder_must_match(self):
         source = self.source_copy()

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import shutil
@@ -258,6 +259,18 @@ def build(source: Path, output: Path) -> None:
             license_page(locale, prefix, t, projects), encoding="utf-8"
         )
     (output / ".nojekyll").touch()
+    # Keep stable file paths while invalidating cached assets after an update.
+    versions = {
+        name: hashlib.sha256((output / "assets" / name).read_bytes()).hexdigest()[:12]
+        for name in ("style.css", "app.js")
+    }
+    asset_ref = re.compile(r'((?:href|src)="[^"]*assets/(style\.css|app\.js))"')
+    for page in output.rglob("*.html"):
+        html = asset_ref.sub(
+            lambda match: f'{match[1]}?v={versions[match[2]]}"',
+            page.read_text(encoding="utf-8"),
+        )
+        page.write_text(html, encoding="utf-8")
     validate(output)
     print(
         f"Built {len(projects)} projects × 2 locales; six real demo slots per page; links, translations and animation frames verified: {output}"
