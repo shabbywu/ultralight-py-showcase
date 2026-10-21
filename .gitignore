@@ -9,3 +9,6 @@ dist/
 
 # Local development reference; not part of the public repository.
 /ultralight_bridge_lab_spec.html
+
+# Local TypeScript packages
+node_modules/
