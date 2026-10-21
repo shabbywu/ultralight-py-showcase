@@ -126,5 +126,42 @@
       "zh-CN": "来源与使用说明",
       "en": "Source & usage notes"
     }
+  },
+  {
+    "id": "ashen-reliquary",
+    "title": "Ashen Reliquary",
+    "kind": {
+      "zh-CN": "ARPG 装备 / 网格背包",
+      "en": "ARPG equipment / Grid inventory"
+    },
+    "description": {
+      "zh-CN": "整理遗物、穿戴装备、拆分堆叠并镶嵌宝石。独立 TypeScript 网格引擎驱动三栏界面，同一份前端可在浏览器试玩，也可接入 Python 原生窗口保存完整存档。",
+      "en": "Arrange relics, equip gear, split stacks, and socket gems. An independent TypeScript grid engine powers the three-panel interface, with a playable browser version and full-snapshot persistence in the Python native host."
+    },
+    "features": {
+      "zh-CN": [
+        "网格拖拽与旋转",
+        "装备与镶嵌",
+        "拖拽快捷栏"
+      ],
+      "en": [
+        "Grid drag & rotation",
+        "Equipment & sockets",
+        "Drag-to-bind quickbar"
+      ]
+    },
+    "source": "https://github.com/shabbywu/ultralight-py-showcase/tree/main/examples/ashen-reliquary",
+    "guide": "https://github.com/shabbywu/ultralight-py-showcase/tree/main/examples/ashen-reliquary#readme",
+    "image": "assets/ashen-reliquary.png",
+    "demo": "demos/ashen-reliquary/",
+    "image_alt": {
+      "zh-CN": "Ashen Reliquary 原生窗口：角色属性、人物装备、网格背包与带物品图标的快捷栏",
+      "en": "Ashen Reliquary native window: character stats, equipment, grid inventory, and an item-icon quickbar"
+    },
+    "license": "assets/ashen-reliquary-NOTICE.md",
+    "license_label": {
+      "zh-CN": "源码与美术来源说明",
+      "en": "Source & artwork notices"
+    }
   }
 ]

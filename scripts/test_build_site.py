@@ -27,9 +27,9 @@ class BuildTests(unittest.TestCase):
         for locale in build_site.LOCALES:
             html = (output / locale / "index.html").read_text()
             self.assertIn(f'lang="{locale}"', html)
-            self.assertEqual(html.count('class="media-pair"'), 3)
+            self.assertEqual(html.count('class="media-pair"'), 4)
             self.assertEqual(html.count('class="demo motion-demo"'), 3)
-            self.assertEqual(html.count('class="demo still-demo"'), 3)
+            self.assertEqual(html.count('class="demo still-demo"'), 4)
             self.assertEqual(html.count("data-animation="), 3)
             self.assertIn("https://github.com/shabbywu/ultralight-py", html)
             self.assertIn("../assets/", html)

@@ -1,6 +1,6 @@
 {
   "page_title": "ultralight-py · 原生桌面示例集",
-  "page_description": "探索 shabbywu/ultralight-py：Python 逻辑、Web 界面与原生桌面。查看 Emberkeep、PianoScope 和 Bridge Lab 的真实动图、截图与源码。",
+  "page_description": "探索 shabbywu/ultralight-py：Python 逻辑、Web 界面与原生桌面。查看 Emberkeep、PianoScope 和 Bridge Lab 的真实动图、截图与源码。 体验 Ashen Reliquary 的网格背包与装备系统。",
   "skip": "跳到示例",
   "nav_examples": "示例",
   "nav_start": "开始使用",
@@ -14,7 +14,7 @@
   "diagram_one": "同一份代码",
   "diagram_two": "更丰富的界面",
   "diagram_three": "原生的体验",
-  "collection_title": "三个样例，各有表达。",
+  "collection_title": "四个样例，各有表达。",
   "collection_note": "原生应用 · 真实运行画面",
   "project_index": "样例索引",
   "source": "源码",
@@ -44,11 +44,14 @@
   "copied": "已复制",
   "copy_failed": "请手动选择并复制命令",
   "licenses": "资源与许可",
-  "footer_note": "本站提供演示与源码入口，应用需在本地桌面运行。",
+  "footer_note": "展示、源码与在线试玩。Python 原生示例需在本地桌面运行。",
   "license_title": "展示素材与许可",
-  "license_description": "所有演示均来自实际原生应用运行。动图经过缩放与 WebP 压缩，无音轨；静图来自真实窗口截图。原始录制帧及机器报告留在本地，不随站点发布。",
+  "license_description": "所有演示均来自实际原生应用运行。动图经过缩放与 WebP 压缩，无音轨；静图来自真实窗口截图。原始录制帧及机器报告留在本地，不随站点发布。 Ashen Reliquary 提供原生静态截图和浏览器试玩，不提供录制动图。",
   "license_code": "应用源码、音源、字体和第三方组件遵循各自许可；展示图不包含这些资源的可分发原文件。",
   "back": "回到示例集",
   "open_image": "打开原图",
-  "license_details": "组件与素材说明"
+  "license_details": "组件与素材说明",
+  "try_demo": "在线试玩",
+  "browser_demo": "浏览器独立版",
+  "browser_demo_note": "本地浏览器存档，无需 Python"
 }

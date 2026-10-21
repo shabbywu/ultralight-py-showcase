@@ -97,7 +97,6 @@ def read_content(source: Path) -> tuple[list[dict], dict[str, dict]]:
             "description",
             "features",
             "image_alt",
-            "animation_alt",
             "license_label",
         ):
             if set(project[field]) != set(LOCALES) or not all(project[field].values()):
@@ -108,7 +107,7 @@ def read_content(source: Path) -> tuple[list[dict], dict[str, dict]]:
             if key in project and urlsplit(project[key]).scheme != "https":
                 raise ValueError(f"Project links must use HTTPS: {key}")
         for key in ("image", "poster", "animation", "license", "notice"):
-            if key not in project and key == "notice":
+            if key not in project and key in ("notice", "poster", "animation"):
                 continue
             target = (source / project[key]).resolve()
             if (
@@ -116,9 +115,14 @@ def read_content(source: Path) -> tuple[list[dict], dict[str, dict]]:
                 or not target.is_file()
             ):
                 raise ValueError(f"Missing demo or license: {project['id']}.{key}")
-        animation_frames(source / project["animation"])
+        if "animation" in project:
+            animation_frames(source / project["animation"])
+            dimensions(source / project["poster"])
+            if set(project.get("animation_alt", {})) != set(LOCALES):
+                raise ValueError("Missing animation translations")
         dimensions(source / project["image"])
-        dimensions(source / project["poster"])
+        if "demo" in project and project["demo"] != f"demos/{project['id']}/":
+            raise ValueError("Unexpected browser demo path")
     return projects, catalogs
 
 
@@ -126,16 +130,14 @@ def project_card(
     project: dict, locale: str, prefix: str, t: dict, source: Path, index: int
 ) -> str:
     title, slug = e(project["title"]), e(project["id"])
-    image, poster, animation = (
-        e(prefix + project[key]) for key in ("image", "poster", "animation")
-    )
-    alt, motion_alt = (
-        e(project["image_alt"][locale]),
-        e(project["animation_alt"][locale]),
-    )
+    image = e(prefix + project["image"])
+    poster = e(prefix + project.get("poster", project["image"]))
+    animation = e(prefix + project.get("animation", ""))
+    alt = e(project["image_alt"][locale])
+    motion_alt = e(project.get("animation_alt", project["image_alt"])[locale])
     label = e(t["expand_label"].format(project=project["title"]))
     width, height = dimensions(source / project["image"])
-    pw, ph = dimensions(source / project["poster"])
+    pw, ph = dimensions(source / project.get("poster", project["image"]))
     tags = "".join(f"<li>{e(tag)}</li>" for tag in project["features"][locale])
     links = "".join(
         f'<a href="{e(project[key])}">{e(t[label])} <span aria-hidden="true">↗</span></a>'
@@ -146,15 +148,27 @@ def project_card(
         )
         if key in project
     )
-    return f'''<article class="project" id="{slug}" aria-labelledby="{slug}-title">
-  <div class="project-heading"><h3 id="{slug}-title"><span class="project-number">{index:02}</span>{title}</h3><span class="kind">{e(project["kind"][locale])}</span><div class="project-links">{links}</div></div>
-  <p class="project-description">{e(project["description"][locale])}</p><ul class="tags">{tags}</ul>
-  <div class="media-pair">
+    if project.get("animation"):
+        motion = f'''
     <figure class="demo motion-demo" data-animation="{animation}" data-poster="{poster}" data-title="{title}">
       <figcaption><span class="media-title"><i class="media-dot" aria-hidden="true"></i>{e(t["animated"])}</span><span class="loop-label"><span aria-hidden="true">↻</span>{e(t["loop_preview"])}</span></figcaption>
       <img class="demo-image animated-image" src="{poster}" width="{pw}" height="{ph}" loading="lazy" decoding="async" alt="{motion_alt}">
       <div class="motion-controls"><button type="button" class="motion-toggle" aria-pressed="false" hidden><span class="motion-symbol" aria-hidden="true">▶</span><span class="motion-label">{e(t["play"])}</span></button><span class="motion-state">{e(t["paused"])}</span><noscript><a href="{animation}">{e(t["play"])} ↗</a></noscript></div>
-    </figure>
+    </figure>'''
+    else:
+        demo = e(prefix + project["demo"])
+        links += f'<a href="{demo}">{e(t["try_demo"])} <span aria-hidden="true">↗</span></a>'
+        motion = f'''<figure class="demo interactive-demo">
+      <figcaption><span class="media-title">{e(t["try_demo"])}</span><span>{e(t["browser_demo"])}</span></figcaption>
+      <a href="{demo}" aria-label="{e(t['try_demo'])} · {title}"><img class="demo-image" src="{image}" width="{width}" height="{height}" loading="lazy" alt="{alt}"></a>
+      <div class="still-caption"><a href="{demo}">{e(t["try_demo"])} ↗</a> · {e(t["browser_demo_note"])}</div>
+    </figure>'''
+    return f'''<article class="project" id="{slug}" aria-labelledby="{slug}-title">
+  <div class="project-heading"><h3 id="{slug}-title"><span class="project-number">{index:02}</span>{title}</h3><span class="kind">{e(project["kind"][locale])}</span><div class="project-links">{links}</div></div>
+  <p class="project-description">{e(project["description"][locale])}</p><ul class="tags">{tags}</ul>
+  <div class="media-pair">
+    {motion}
+
     <figure class="demo still-demo">
       <figcaption><span class="media-title"><span class="image-icon" aria-hidden="true">▧</span>{e(t["still"])}</span><a class="expand" href="{image}" aria-label="{label}" data-lightbox data-title="{title}" data-alt="{alt}">{e(t["expand"])} ↗</a></figcaption>
       <a class="still-link" href="{image}" aria-label="{label}" data-lightbox data-title="{title}" data-alt="{alt}"><img class="demo-image still-image" src="{image}" width="{width}" height="{height}" loading="lazy" decoding="async" alt="{alt}"></a>
@@ -231,6 +245,16 @@ def build(source: Path, output: Path) -> None:
     if output.exists():
         shutil.rmtree(output)
     shutil.copytree(source / "assets", output / "assets")
+    for project in projects:
+        if project.get("demo"):
+            built = ROOT / "examples" / project["id"] / "web/dist"
+            if not (built / "index.html").is_file():
+                raise ValueError(f"Build browser demo first: {project['id']}")
+            destination = output / project["demo"]
+            shutil.copytree(built, destination)
+            # Make source and all retained notices available with the demo.
+            shutil.copy2(ROOT / "examples" / project["id"] / "LICENSE.GPL-3.0.txt", destination)
+            shutil.copy2(ROOT / "examples" / project["id"] / "THIRD_PARTY_NOTICES.md", destination)
     for locale, directory in (("zh-CN", ""), ("zh-CN", "zh-CN"), ("en", "en")):
         prefix = "../" if directory else ""
         folder = output / directory
@@ -273,7 +297,7 @@ def build(source: Path, output: Path) -> None:
         page.write_text(html, encoding="utf-8")
     validate(output)
     print(
-        f"Built {len(projects)} projects × 2 locales; six real demo slots per page; links, translations and animation frames verified: {output}"
+        f"Built {len(projects)} projects × 2 locales; showcase media and browser demos; links, translations and animation frames verified: {output}"
     )
 
 
