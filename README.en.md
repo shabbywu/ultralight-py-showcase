@@ -9,19 +9,17 @@ A bilingual showcase and source hub for [shabbywu/ultralight-py](https://github.
 | [Emberkeep](https://github.com/shabbywu/emberkeep) | Implemented: pixel-art roguelike | `examples/emberkeep`, a submodule pinned to a specific revision |
 | [PianoScope](examples/pianoscope/README.md) | Runnable: MusicXML piano practice, falling notes / grand staff, and PDF / original file / MIDI export | `examples/pianoscope`, including local sound assets, tests, a user guide, and sample resources |
 | [Bridge Lab](examples/bridge-lab/README.md) | Implemented: six bridge experiments with editing on both the Python and JavaScript sides | `examples/bridge-lab`, including native smoke tests and a Chinese guide |
-| [Ashen Reliquary](examples/ashen-reliquary/README.md) | Independent TypeScript grid inventory, ARPG equipment and Python native input checks | `examples/ashen-reliquary`, with native input checks and asset notices |
+| [Ashen Reliquary](examples/ashen-reliquary/README.md) | Python-owned inventory, ARPG equipment and an event-driven Vue interface | `examples/ashen-reliquary`, with native input checks and asset notices |
 
-Emberkeep, PianoScope, and Bridge Lab include animated WebP recordings and separate native still images, with controls to pause and enlarge the preview. Ashen Reliquary provides a native screenshot and an interactive browser demo. The animations are silent previews; native examples do not run in the browser. Native examples require a desktop environment. Each project maintains its own dependency, execution, and validation instructions.
+All four examples include animated WebP recordings and separate native still images, with controls to pause and enlarge the preview. These are silent recordings; applications do not run in the browser. Native examples require a desktop environment. Each project maintains its own dependency, execution, and validation instructions.
 
 ## Get started and preview
 
-Requires Python 3.10+ and Node.js 20+. npm builds the Ashen browser demo; the site generator has no third-party Python dependencies.
+Building the website requires only Python 3.10+, with no Node.js or third-party Python dependencies.
 
 ```sh
 git clone --recurse-submodules https://github.com/shabbywu/ultralight-py-showcase.git
 cd ultralight-py-showcase
-npm ci --prefix examples/ashen-reliquary/web
-npm run build --prefix examples/ashen-reliquary/web
 python scripts/build_site.py
 python -m unittest discover -s scripts -p 'test_*.py' -v
 python -m http.server 8000 --directory dist
@@ -54,7 +52,7 @@ examples/pianoscope/        Native piano practice player, MusicXML scores and ex
 
 Before pushing changes to `main`, select **GitHub Actions** under Settings → Pages → Build and deployment → Source in the repository.
 
-The `Showcase Pages` workflow builds and validates pull requests, and builds and deploys the `main` branch. The site packages showcase content and the Ashen browser demo, with corresponding source links. Native dependencies are not published.
+The `Showcase Pages` workflow builds and validates pull requests, and builds and deploys the `main` branch. The site packages recorded media and showcase pages with corresponding source links. Native dependencies and browser-playable builds are not published.
 
 Default destination: https://shabbywu.github.io/ultralight-py-showcase/. Check Actions and Pages settings for the actual deployment status.
 
@@ -63,5 +61,3 @@ Default destination: https://shabbywu.github.io/ultralight-py-showcase/. Check A
 See the [integration guide](CONTRIBUTING.md) for adding or updating examples, and each example's README for execution, testing, and platform validation instructions.
 
 The original scores, games, and associated showcase assets for Emberkeep and PianoScope retain their respective MIT licenses. Bridge Lab and newly added website code do not yet have a shared license. See the [showcase asset notes](site/assets/MEDIA.md) for asset sources and permitted scope of use. Each example and third-party component retains its own license.
-
-[Ashen Reliquary · Play in browser](https://shabbywu.github.io/ultralight-py-showcase/demos/ashen-reliquary/)

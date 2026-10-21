@@ -7,14 +7,6 @@ import vue2 from '@vitejs/plugin-vue2'
 // https://vitejs.dev/config/
 export default defineConfig({
   base: './',
-  server: {
-    fs: {
-      allow: [
-        fileURLToPath(new URL('.', import.meta.url)),
-        fileURLToPath(new URL('../packages/grid-inventory', import.meta.url)),
-      ],
-    },
-  },
   plugins: [
     vue2(),
     legacy({

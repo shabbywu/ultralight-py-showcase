@@ -1,25 +1,58 @@
-# Godot 回移契约（本轮不修改 C# 示例）
+# Godot / Ultralight 后端接入
 
-共享 `packages/grid-inventory`、Vue 页面、业务定义、business 模块和素材。去掉原先每个背包的宿主对象，不移植旧布局类或继承关系。Vue 不升级。
+Python 示例采用后端权威模型。Godot Sample 2 可复用 `web/` 界面与 DOM 视图，C# 实现同样的类型模型、原子能力和业务接口。前端不持有权威状态。
 
-宿主提供：
+## 自底向上的类型边界
 
-| 方法 | 输入 | 返回 |
+- `models.py`：`Position`、`Item`、`Definition`、`Container`、`Snapshot`、`Success/Failure` 等 dataclass，枚举描述容器种类、事件和失败码。
+- `inventory.py`：`Inventory` 持有并校验完整状态；`InventoryTransaction` 提供增删、移动、拆分、合并、消费、绑定和寻找位置等原子方法。候选与权威状态隔离，完整校验成功后才提交。
+- `game.py`：组合原子方法，实现装备冲突回装、自动选槽、转移、镶嵌、快捷栏效果和随机生成。这里决定游戏业务，不在 Inventory 中分发字符串命令。
+- `codec.py`：仅在磁盘和桥接边界解析／编码字典，不把动态记录传入领域层。
+- `bridge.py`：公开显式标注参数的方法，不接受通用 Command、批量字典或前端快照。
+
+JSON 只用于文件持久化。桥接使用原生标量参数与独立对象副本。前端使用 `Python.to_value()` 将返回值转成普通 JS 数据；Godot 应提供等价的深复制转换。
+
+## 应用接口
+
+Python 在 `inventory.backend` 注册一个应用对象。以下方法的 Python 签名是具体协议，C# 应逐个实现；每个写方法的最后一个参数为可选 `expected_revision: int`。
+
+| 方法 | 参数（不含 expected_revision） | 业务职责 |
 |---|---|---|
-| load_snapshot | 无 | 全量快照 JSON 字符串；首次启动返回 `null` JSON |
-| save_snapshot | 全量快照 JSON 字符串 | 成功完成；失败抛出可显示异常 |
+| `create_relic()` | 无 | 后端选择定义、生成 ID、放置并提交 |
+| `move_item()` | item_id, container_id, x, y, rotation | 精确移动 |
+| `remove_item()` | item_id | 删除物品及其 socket 子树 |
+| `split_stack()` | item_id, quantity, container_id, x, y, rotation | 后端分配新身份并拆分 |
+| `merge_stacks()` | item_id, target_id | 合并与引用重定向 |
+| `equip_item()` | item_id, slot_id | 装备并原子回装冲突物品 |
+| `equip_best_slot()` | item_id | 自动选兼容槽或卸装回 Bag |
+| `transfer_item()` | item_id | 按业务规则选择目标网格 |
+| `socket_gem()` | item_id, socket_id | 镶嵌一颗宝石 |
+| `unsocket_gem()` | item_id, container_id | 摘除并合并或找空位 |
+| `bind_item()` | key, item_id | 绑定现有物品引用 |
+| `activate_shortcut()` | key | 根据后端引用执行业务效果 |
 
-旧 `load_layout(name)` 仅作为一次性迁移读取接口，返回旧记录数组或 `null` JSON。迁移成功前不得覆盖旧文件。新快照通过 schemaVersion、revision 管理，保存使用临时文件后原子替换；不再逐背包保存。宿主不计算布局，也不保存 HTML。JSON 类型详见包的 `Snapshot`。
+除 `create_relic` 外，上述操作各有对应的 `preview_方法名`，参数不包含 revision。预览不提交、不分配永久 ID、不发事件。
 
-所有物品移动、装备、堆叠、镶嵌与消费通过 `engine.execute(command | commands[], expectedRevision?)`；宿主需要发命令时透传 Command 的 JSON 字段。先 `preview`，再以其 revision 执行原命令；不得把预览结果当命令提交。失败返回 `ok:false,code,message`。一次事务只订阅一次 change 进行全量保存。定义、接收规则和业务效果由应用注册，不通过 JSON 传函数。
+`definitions` 返回物品定义；`read()` 返回 `{snapshot, attributes, dirty, persistenceError}`；`comparison(item_id)` 返回装备属性差值或说明；`save()` 只重试后端当前状态的保存；`host_name()` 返回显示名称。
 
-回移检查：
+没有 `dispatch(dict | list)`、`load(snapshot)` 或 `save_snapshot(snapshot)`。页面没有添加任意物品或直接消费任意数量的接口。前端拖拽使用的 TypeScript Command 仅存在于 DOM 视图内部，适配层将它转换成明确的应用方法调用；不会把 Command 字典发送给后端。
 
-1. 将 Python/浏览器存储适配替换为以上 Godot 桥接，保持核心与 DOM 包原样。
-2. C# ItemDB 对齐业务定义 ID、尺寸、旋转、槽位与堆叠上限；实例 ID 不变。
-3. 八装备槽、socket owner 和快捷栏引用必须一起恢复；双手武器只有一份实例。
-4. 提供旧布局读取和备份；未知素材或非法状态显示具体错误，不自动重置。
-5. 重新运行全部纯核心测试，补充 Godot 真实鼠标、键盘、焦点和 DPI 验收。
-6. 单独验证 Godot 保存失败可重试、重载后恢复、桥接异常以及打包后的资源路径。
+## 事务与通知
 
-不包含网络同步、战斗结算、异形占格、嵌套背包、触摸或手柄。
+后端事务顺序：组合原子操作 → 完整校验候选 → 替换权威状态 → 尝试持久化 → 发布 `stateChanged`。调用方传入的旧 revision 被拒绝；失败不提交、不通知。
+
+New relic 不依赖页面点击：宿主游戏逻辑直接调用 `Game.create_relic()`，同样触发界面更新。
+
+后端通过受作用域管理的 JSValue 发出 DOM 事件：
+
+```js
+window.dispatchEvent(new CustomEvent("inventory-changed", {
+  detail: { type: "stateChanged", revision: 1 }
+}));
+```
+
+前端先订阅，再 `read()`；每次通知重新读取展示副本并替换渲染状态。修改副本不会写回后端，也不依赖 Vue 观察宿主对象。命令返回成功不被视为前端自行提交状态的依据。
+
+`persistenceChanged` 表示保存重试状态。保存失败保留已提交游戏状态，标记 dirty 并显示错误。文件先写临时路径，再原子替换；成功后才更新已保存副本。加载时先严格解码，再由 Inventory 完整校验领域状态。
+
+页面重载保留宿主状态和单个事件通道，新页面订阅后读取当前快照；窗口关闭解除宿主订阅。Godot 需单独验证真实输入、焦点、DPI、保存失败及打包资源路径。

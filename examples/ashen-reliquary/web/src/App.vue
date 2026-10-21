@@ -1,20 +1,16 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from "vue";
 import { InventoryView } from "grid-inventory/dom";
-import {
-  engine,
-  definitions,
-  addRelic,
-  hostName,
-  save,
-  persistenceError,
-  activate,
-} from "./session";
-import { attributes, comparison } from "./business";
+const props = defineProps({
+  session: { type: Object, required: true },
+  hostName: { type: String, required: true },
+});
+const { session } = props;
+const { engine, definitions, addRelic, save, activate, attributes, comparison } = session;
 const quickbar = ref(null),
   grids = ref(null),
   status = ref(
-    persistenceError ||
+    session.persistenceError ||
       "Drag · R rotate · double click equip · Shift click transfer · Ctrl drag split · wheel quantity"
   ),
   hover = ref(null),
@@ -47,13 +43,15 @@ const selectedDefinition = computed(() =>
   definitions.find((d) => d.id === selectedItem.value?.definition)
 );
 function persist() {
-  status.value = save() ? "Snapshot saved" : persistenceError;
+  status.value = save() ? "Snapshot saved" : session.persistenceError;
 }
 function reload() {
   location.reload();
 }
 function report(result) {
-  status.value = result.ok ? "Transaction committed" : result.message;
+  status.value = result.ok
+    ? session.persistenceError || "Transaction committed"
+    : result.message;
 }
 const shortcutSlots = computed(() => Array.from({ length: 6 }, (_, index) => {
   const key = String(index + 1);
@@ -82,7 +80,6 @@ function discard() {
 onMounted(() => {
   view = new InventoryView(engine, grids.value, {
     cellSize: 38,
-    isFocused:()=>window.__inventoryNativeFocused??document.hasFocus(),
     gap: 2,
     dropTarget(item, hit) {
       const slot = hit?.closest("[data-shortcut]");
@@ -92,18 +89,7 @@ onMounted(() => {
         command: { type: "bind", key: slot.dataset.shortcut, reference: { item: item.id } },
       };
     },
-    command(item, to, c) {
-      return c.kind === "slot"
-        ? { type: "equip", id: item.id, slot: c.id }
-        : c.kind === "socket"
-        ? {
-            type: "socket",
-            id: item.id,
-            socket: c.id,
-            newId: "socket-" + item.id + "-" + engine.snapshot().revision,
-          }
-        : { type: "move", id: item.id, to };
-    },
+    command: session.dropCommand,
     render(item) {
       const d = definitions.find((d) => d.id === item.definition),
         el = document.createElement("div");
@@ -150,13 +136,17 @@ onMounted(() => {
     }),
     engine.on("change", (value) => {
       snapshot.value = value;
-      if (persistenceError) status.value = persistenceError;
+      if (session.persistenceError) status.value = session.persistenceError;
+    }),
+    engine.on("persistence", ({ error }) => {
+      if (error) status.value = error;
     }),
     engine.on("reject", report)
   );
 });
 onBeforeUnmount(() => {
   view?.destroy();
+  session.dispose();
   unsub.forEach((fn) => fn());
 });
 </script>
@@ -170,7 +160,7 @@ onBeforeUnmount(() => {
     <nav class="demo-toolbar">
       <span>{{ hostName }}</span
       ><button
-        @click="status = addRelic() ? 'Relic added to Ground' : 'No space'"
+        @click="report(addRelic())"
       >
         New relic</button
       ><button @click="persist">Save / Retry</button

@@ -44,14 +44,11 @@
   "copied": "已复制",
   "copy_failed": "请手动选择并复制命令",
   "licenses": "资源与许可",
-  "footer_note": "展示、源码与在线试玩。Python 原生示例需在本地桌面运行。",
+  "footer_note": "原生演示录制与源码。Python 示例需在本地桌面运行。",
   "license_title": "展示素材与许可",
-  "license_description": "所有演示均来自实际原生应用运行。动图经过缩放与 WebP 压缩，无音轨；静图来自真实窗口截图。原始录制帧及机器报告留在本地，不随站点发布。 Ashen Reliquary 提供原生静态截图和浏览器试玩，不提供录制动图。",
+  "license_description": "所有演示均来自实际原生应用运行。动图经过缩放与 WebP 压缩，无音轨；静图来自真实窗口截图。原始录制帧及机器报告留在本地，不随站点发布。",
   "license_code": "应用源码、音源、字体和第三方组件遵循各自许可；展示图不包含这些资源的可分发原文件。",
   "back": "回到示例集",
   "open_image": "打开原图",
-  "license_details": "组件与素材说明",
-  "try_demo": "在线试玩",
-  "browser_demo": "浏览器独立版",
-  "browser_demo_note": "本地浏览器存档，无需 Python"
+  "license_details": "组件与素材说明"
 }

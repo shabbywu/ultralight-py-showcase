@@ -1,14 +1,15 @@
-# Ashen Reliquary / 展示与在线试玩说明
+# Ashen Reliquary / 原生演示素材
 
-Source / 完整对应源码：
-https://github.com/shabbywu/ultralight-py-showcase/tree/main/examples/ashen-reliquary
+[完整对应源码 / Source](https://github.com/shabbywu/ultralight-py-showcase/tree/main/examples/ashen-reliquary)
 
-`ashen-reliquary.png` is a real CPU-rendered AppCore capture of the current interface using ultralight-py 0.6.1, prepared for publication on 2026-10-21. Quickbar references were initialized for the showcase. No generated or composited imagery is used. This is a still capture, not an acceptance report or an animated recording.
+`ashen-reliquary-demo.webp`, `ashen-reliquary-poster.png` and `ashen-reliquary.png` are recordings/captures of the actual AppCore CPU window running ultralight-py 0.6.1. The animation demonstrates native input for equipment, drag rotation, shortcut binding, socketing, extraction and stack splitting, plus Python-owned relic generation and state-change notifications. The recording uses an isolated demo session with a deterministic selection of new relic definitions.
 
-截图来自真实 Ultralight 原生窗口，为展示初始化了快捷栏绑定；未重新运行回归。浏览器试玩复用同一份 Vue 2 界面和独立 TypeScript 引擎，使用 localStorage 保存，不连接 Python、不上传存档。
+动图和截图来自真实原生窗口像素。操作通过原生 View 鼠标／键盘接口执行；新物品由 Python 后端生成，最后一次生成由后端直接触发，再通知前端刷新。海报取自动图第一帧；画面仅缩放与压缩，没有生成帧、合成结果或音频。原始帧和时间戳保存在本地 `.tmp/ashen-reliquary/recording/`，不随站点发布。
 
-The browser demo includes derived frontend code with the retained GPL v3 text. Complete example and framework source, dependency lockfiles, and build instructions are linked above. Artwork includes Cleveland Museum of Art CC0 item images, CC0-derived textures and sample artwork. Grenze / Grenze Gotisch fonts use SIL OFL 1.1. Their full notices ship in `demos/ashen-reliquary/reliquary/` and the source tree. Vue and build dependencies retain their own licenses. Native Ultralight libraries are not distributed by this website.
+The current application requires a native backend; GitHub Pages presents recorded media and does not publish a browser-playable build or native Ultralight libraries.
 
-- [Retained GPL v3 text](../demos/ashen-reliquary/LICENSE.GPL-3.0.txt)
-- [Component and source notices](../demos/ashen-reliquary/THIRD_PARTY_NOTICES.md)
-- [Artwork source manifest](../demos/ashen-reliquary/reliquary/LICENSES.md)
+Source code retains its upstream GPL v3 notice. Item photographs are from Cleveland Museum of Art Open Access (CC0); textures derive from CC0 sources. Grenze / Grenze Gotisch fonts use SIL OFL 1.1. Vue and build dependencies retain their own licenses.
+
+- [Retained GPL v3 text](https://github.com/shabbywu/ultralight-py-showcase/blob/main/examples/ashen-reliquary/LICENSE.GPL-3.0.txt)
+- [Component and source notices](https://github.com/shabbywu/ultralight-py-showcase/blob/main/examples/ashen-reliquary/THIRD_PARTY_NOTICES.md)
+- [Artwork source manifest](https://github.com/shabbywu/ultralight-py-showcase/blob/main/examples/ashen-reliquary/web/public/reliquary/LICENSES.md)

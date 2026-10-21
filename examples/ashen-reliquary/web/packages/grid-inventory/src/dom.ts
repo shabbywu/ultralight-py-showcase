@@ -1,4 +1,8 @@
 import { Inventory, Item, Position, Command, Container } from "./core";
+// A renderer can use a local engine or an authoritative host adapter.
+export type InventoryPort = Pick<Inventory,
+  "snapshot" | "preview" | "execute" | "definitions" | "dimensions" | "occupant" | "on" | "emit">;
+
 export type Hover = {
   phase: "enter" | "move" | "leave";
   itemId: string;
@@ -10,7 +14,6 @@ export type Hover = {
 export type ViewOptions = {
   cellSize?: number;
   gap?: number;
-  isFocused?:()=>boolean;
   render: (item: Item) => HTMLElement;
   command?: (item: Item, to: Position, container: Container) => Command;
   dropTarget?: (item: Item, hit: Element | null) => { element: HTMLElement; command: Command } | undefined;
@@ -46,7 +49,7 @@ export class InventoryView {
   private drag?: Drag;
   private split?: { id: string; quantity: number; newId: string };
   constructor(
-    private engine: Inventory,
+    private engine: InventoryPort,
     private root: HTMLElement,
     private options: ViewOptions
   ) {}
@@ -209,10 +212,10 @@ export class InventoryView {
       const pointerId = (e as PointerEvent).pointerId;
       if (pointerId !== undefined && el.setPointerCapture)
         el.setPointerCapture(pointerId);
-      let focused = this.options.isFocused?.()??document.hasFocus();
+      let focused = document.hasFocus();
       const checkFocus = () => {
         if (!this.drag) return;
-        const next = this.options.isFocused?.()??document.hasFocus();
+        const next = document.hasFocus();
         if (focused && !next) {
           this.cancel("focus");
           return;
@@ -376,7 +379,7 @@ export class InventoryView {
       move as EventListener
     );
     listen(document, pointer ? "pointerup" : "mouseup", up as EventListener);
-    listen(window, "blur", () => {if(!this.options.isFocused||!this.options.isFocused())this.cancel("blur");});
+    listen(window, "blur", () => this.cancel("blur"));
     listen(document, "pointercancel", () => this.cancel("pointercancel"));
     listen(this.root, "mouseleave", () => {
       if (!this.drag) this.endHover();

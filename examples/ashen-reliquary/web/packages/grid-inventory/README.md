@@ -62,3 +62,12 @@ During dragging, R changes the held orientation whenever the definition allows r
 Ctrl can be pressed or released anytime during dragging; the modifier on mouse/pointer release determines split versus whole-stack movement. Splitting defaults to half the stack, and toggling Ctrl preserves the adjusted split quantity. While holding the split, the wheel adjusts quantity within 1..quantity-1. The ghost displays the held quantity. Shift click remains quick transfer. No item instance or quantity change is committed until a valid drop; `splitNextDrag` remains available for custom controls.
 
 `ViewOptions.dropTarget(item, hit)` can return `{element, command}` for targets outside the inventory root. The view previews that command, highlights the target bounds, and commits on release using the drag revision. Ashen uses this for quickbar bindings; binding references the original item even while Ctrl split mode is active. A completed drag suppresses the subsequent click to prevent accidental activation.
+
+## Host-owned state
+
+`InventoryView` accepts an `InventoryPort` containing `snapshot`, `preview`, `execute`,
+`definitions`, `dimensions`, `occupant`, `on`, and `emit`. Ashen Reliquary implements
+this port with Python commands and detached render snapshots. It does not construct
+a browser `Inventory`. A host change event refreshes the port and view; a successful
+command result alone does not commit front-end state. The standalone TypeScript
+engine remains available for other consumers of this package.
