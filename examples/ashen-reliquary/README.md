@@ -1,10 +1,24 @@
 # Ashen Reliquary
 
-Vue 2 示例业务层接入本地 TypeScript 包 [grid-inventory](packages/grid-inventory/README.md)。运行时已移除 GridStack；纯核心不导入 DOM、Vue、Python 或 Godot。Vue 与 Vite 沿用现有版本。
+基于 ultralight-py 原生窗口的背包示例。Python 持有权威状态和业务规则；Vue 2 与 DOM 视图只提交命令、渲染副本。后续 Godot Sample 2 可复用前端并实现相同宿主协议。
 
-界面为业务属性、人物装备、背包三栏。Ground 抽屉保留 12×12，Bag 保留 12×6；调整窗口不会重新排列物品。复用 Ashen 字体、物品和 effigy 人物素材。`web/src/business.js` 提供演示属性和装备比较，这些数值不进入框架。
+## 结构
 
-[浏览器在线试玩](https://shabbywu.github.io/ultralight-py-showcase/demos/ashen-reliquary/) · 浏览器存档与 Python 存档独立。
+| 目录 | 职责 |
+|---|---|
+| `web/packages/grid-inventory/` | TypeScript 背包核心与可选 DOM 视图，见[包说明](web/packages/grid-inventory/README.md) |
+| `web/src/game/` | 只读展示副本、后端命令与事件适配 |
+| `web/src/main.js` | 连接后端事件并装配 Vue 界面 |
+| `reliquary/state.py` | 内存／文件快照存储，原子写入 |
+| `reliquary/models.py` | 明确的领域 dataclass 与枚举 |
+| `reliquary/inventory.py` | 状态校验与原子事务方法 |
+| `reliquary/game.py` | 权威状态、初始化、物品生成、业务规则与事件 |
+| `reliquary/catalog.json` | 后端物品定义与默认容器 |
+| `reliquary/codec.py` | 磁盘与桥接边界的数据编解码 |
+| `reliquary/bridge.py` | 明确的方法接口与宿主事件桥接 |
+| `run.py` | ultralight-py 窗口启动入口 |
+
+前端不导入背包核心来提交本地事务。DOM 视图通过 `InventoryPort` 调用后端预览与命令接口；后端提交后发布事件，前端重新获取展示副本。Godot 接口见 [Godot 接入](docs/GODOT_ADAPTER.md)。
 
 ## 运行
 
@@ -18,50 +32,38 @@ python -m venv .venv
 .venv/bin/python run.py --cpu
 ```
 
-原生窗口需要桌面环境、Python 3.10+ 和 ultralight-py 0.6.1。前端开发可执行 `npm run dev --prefix web -- --host 127.0.0.1`。独立静态服务执行 `python run.py --browser --port 4175`，访问 http://127.0.0.1:4175/ 。浏览器模式不导入 ultralight-py。
+原生窗口需要桌面环境、Python 3.10+ 和 ultralight-py 0.6.1。默认仅在进程内保存，`--state path/to/state.json` 开启文件持久化。
 
-原生默认仅进程内保存；使用 `--state path/to/state.json` 开启跨启动持久化。浏览器使用 localStorage，与 Python 存档独立。
+前端修改后重新执行 `npm run build --prefix web`，再通过 ultralight-py 运行。前端需要宿主桥接，不提供 localStorage 权威状态或独立浏览器运行模式。
 
-## 操作
+## 操作与存档
 
-- 拖动严格落格；碰撞、越界和无效目标取消。拿起后按 R 自由旋转，与当前落点是否可放置无关；落点独立显示合法性，释放时校验提交。Escape 或失焦取消。
-- 双击装备／卸装；Shift 点击在 Ground、Bag 间快捷转移。双手武器占主手并引用占用副手，旧装备必须全部放回来源网格才换装。
-- 拖到兼容堆叠上合并，超过上限的余量留在原处。
-- 拖动堆叠时随时按下／松开 Ctrl 切换拆分，释放时确定；默认一半，滚轮调整数量。取消不生成实例。
-- 把 Ember Gem 拖到 Saint-Socket 镶嵌一颗；悬停孔内宝石，点 Remove gem to Bag 摘除。已有宝石随 Saint-Breaker 移动。
-- 将物品直接拖到快捷栏槽位绑定引用，已有绑定可覆盖；物品仍在原容器，绑定不拆分、不消耗；点击快捷栏激活。Ember Flask 的消耗由示例业务处理。
-- Save / Retry 显式保存或重试；错误显示在状态栏。Offer to the ashes 删除选中的物品。
+- New relic 请求后端生成物品；后端选择定义、分配 ID、放置并提交后，通知前端刷新。
+- 拖动物品落格；R 旋转，Escape 或失焦取消。Ground 为 12×12，Bag 为 12×6，窗口缩放不重排物品。
+- 双击装备／卸装，Shift 点击在 Ground 与 Bag 间转移。双手武器同时占用主副手。
+- 拖到兼容堆叠上合并；释放时按住 Ctrl 拆分，滚轮调整数量，取消不生成实例。
+- 将 Ember Gem 拖到 Saint-Socket 镶嵌，选中宝石后点击 Remove gem to Bag 摘除。
+- 将物品拖到快捷栏绑定，点击或按 1–6 激活；Ember Flask 消耗由后端处理。
+- Save / Retry 保存或重试；Offer to the ashes 删除选中物品。
 
-控制台 `Reliquary.snapshot()` 返回全量快照；`Reliquary.engine` 可查看事务预览、命令和事件；`Reliquary.view` 可检查视图生命周期。
+全量快照包含版本、修订号、容器、物品与快捷栏引用，不包含 HTML。每次后端事务提交后自动保存；保存失败保留游戏内操作并允许重试。加载失败阻止覆盖原存档。旧版布局存档和迁移接口已移除，旧文件需要自行移走后重新开始。
 
-## 快照与迁移
+控制台 `Reliquary.snapshot()` 返回快照，`Reliquary.engine` 提供后端命令与预览适配（不提供状态加载），`Reliquary.view` 提供视图调试入口。
 
-唯一新存档包含 `schemaVersion:1`、`revision`、全部 `containers`、`items`、`shortcuts`。定义由业务目录提供，快照不包含 HTML、DOM 或函数。位置支持 grid、slot、socket，孔通过 `owner` 关联装备。快捷栏只保存 item/action 引用。
-
-首次读取旧存档时，只按已知素材文件名识别定义，保留实例 ID、坐标、数量与朝向。无法识别的物品、无效坐标或重复 ID 阻止加载，具体错误显示到状态栏，不自动覆盖原存档。浏览器保留旧 localStorage 键；Python 首次写入迁移后的快照前保留 `.legacy.bak`。Python 继续先写临时文件，再原子替换；写入失败回滚内存状态并允许重试。
-
-## 验收
+## 检查
 
 ```sh
 npm test --prefix web
-npm run check --prefix packages/grid-inventory
+npm run check --prefix web/packages/grid-inventory
 python -m unittest discover -s tests -v
-python run.py --cpu --smoke --width 1440 --height 1000
-python run.py --cpu --standalone --smoke --width 1440 --height 1000 --output ../../.tmp/ashen-reliquary/standalone
 ```
 
-核心回归包括原子失败、修订号、数量守恒、拆分取消、两件装备回装与满空间失败、镶嵌与摘除、快捷栏重定向、业务拒绝、加载校验、500 次边界操作与 1000 次固定种子随机事务。前端会话测试覆盖迁移、重载和未知物品不覆盖旧存档。Python 测试覆盖全量快照、备份、原子落盘和失败重试。
+后端测试覆盖生成、身份分配、事务失败、修订号、装备、堆叠、镶嵌、引用、随机移动和保存重试；前端测试覆盖事件驱动刷新和副本隔离。通用 TypeScript 包保留独立核心回归，但应用不使用它持有权威状态。
 
-原生 smoke 使用真实 `View.mouse_down/mouse_move/mouse_up`、键盘及焦点事件，逐帧确认无关物品不变，包括缩放、鼠标回退、hover 与视图销毁，并输出实际像素 PNG 和 JSON 报告。分别执行 Python 桥接与独立 localStorage 模式。原生输入验收不代表桌面浏览器验收；本轮按用户要求使用 ultralight-py，桌面浏览器未执行。
+真实 Ultralight 离屏检查：`python -m tools.native_smoke`，验证 Python 主动生成后的页面更新、对象副本隔离、命令、通知及页面重载。这不代表已完成桌面窗口真实输入验收。
 
-默认报告位于仓库根 `.tmp/ashen-reliquary/`。smoke 使用隔离存档，不读写日常 `--state`。
-
-本轮结果见 [验收记录](docs/ACCEPTANCE.md)。
-
-Godot 不在本轮修改，回移契约见 [GODOT_ADAPTER.md](docs/GODOT_ADAPTER.md)。历史布局库调查保留在 [GRIDSTACK.md](docs/GRIDSTACK.md)，不再描述当前实现。
+Python 开发依赖：`pip install -e ".[dev]"`。检查：`ruff check .`、`ruff format --check .` 与 `mypy`（strict 模式，覆盖领域、存储、桥接、入口及检查代码）。
 
 ## 来源
 
-保留上游 GPL v3 文本于 `LICENSE.GPL-3.0.txt`；美术、字体与历史依赖许可见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
-
-拆分操作：拖动物品堆时可随时按下或松开 Ctrl，以释放鼠标时是否按住 Ctrl 决定拆分或整堆移动。拆分默认一半；拖拽中滚轮向上增加、向下减少数量（1 至原数量减 1）。释放到合法空位才提交，Escape、失焦或无效落点均取消。切换 Ctrl 保留已调整的拆分数量。Shift 点击仍为快捷转移。
+代码来源与当前依赖声明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)，上游 GPL v3 文本保留于 `LICENSE.GPL-3.0.txt`。素材来源见 [素材清单](web/public/reliquary/LICENSES.md)，字体 OFL 文本随字体保留。
