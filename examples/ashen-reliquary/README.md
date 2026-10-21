@@ -67,3 +67,5 @@ Python 开发依赖：`pip install -e ".[dev]"`。检查：`ruff check .`、`ruf
 ## 来源
 
 代码来源与当前依赖声明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)，上游 GPL v3 文本保留于 `LICENSE.GPL-3.0.txt`。素材来源见 [素材清单](web/public/reliquary/LICENSES.md)，字体 OFL 文本随字体保留。
+
+站点动图录制：安装可选依赖 `pip install -e ".[media]"`，在桌面环境执行 `python -m tools.record_demo`。录制使用隔离的原生窗口和真实输入，原始帧保存在仓库 `.tmp/ashen-reliquary/recording/`。

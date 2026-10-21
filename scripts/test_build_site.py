@@ -28,9 +28,9 @@ class BuildTests(unittest.TestCase):
             html = (output / locale / "index.html").read_text()
             self.assertIn(f'lang="{locale}"', html)
             self.assertEqual(html.count('class="media-pair"'), 4)
-            self.assertEqual(html.count('class="demo motion-demo"'), 3)
+            self.assertEqual(html.count('class="demo motion-demo"'), 4)
             self.assertEqual(html.count('class="demo still-demo"'), 4)
-            self.assertEqual(html.count("data-animation="), 3)
+            self.assertEqual(html.count("data-animation="), 4)
             self.assertIn("https://github.com/shabbywu/ultralight-py", html)
             self.assertIn("../assets/", html)
             self.assertIn(
@@ -38,6 +38,7 @@ class BuildTests(unittest.TestCase):
                 html,
             )
             self.assertNotIn("{{", html)
+        self.assertFalse((output / "demos").exists())
         self.assertTrue((output / "en/licenses.html").is_file())
         self.assertTrue((output / "zh-CN/licenses.html").is_file())
 

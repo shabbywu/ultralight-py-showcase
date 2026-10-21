@@ -44,14 +44,11 @@
   "copied": "Copied",
   "copy_failed": "Select and copy the command manually",
   "licenses": "Resources & licenses",
-  "footer_note": "Demos, source, and browser play. Python native examples run locally.",
+  "footer_note": "Native recordings and source. Python examples run on your desktop.",
   "license_title": "Demo assets & licenses",
-  "license_description": "Every demo comes from an actual native app session. Animations are resized and WebP-compressed, with no audio; stills are real window captures. Raw frames and machine reports stay local and are not published with the site. Ashen Reliquary provides a native still capture and a browser demo, without a recorded animation.",
+  "license_description": "Every demo comes from an actual native app session. Animations are resized and WebP-compressed, with no audio; stills are real window captures. Raw frames and machine reports stay local and are not published with the site.",
   "license_code": "App code, soundfonts, fonts, and third-party components retain their own licenses. Preview images do not distribute those original resources.",
   "back": "Back to the showcase",
   "open_image": "Open original image",
-  "license_details": "Components & demo provenance",
-  "try_demo": "Try in browser",
-  "browser_demo": "Standalone browser demo",
-  "browser_demo_note": "Browser-local saves; no Python required"
+  "license_details": "Components & demo provenance"
 }
