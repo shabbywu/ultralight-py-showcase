@@ -7,7 +7,7 @@ buildSync({
   entryPoints: [
     path.resolve(
       __dirname,
-      "../../packages/grid-inventory/tests/core.test.ts"
+      "../packages/grid-inventory/tests/core.test.ts"
     ),
   ],
   outfile: output,
