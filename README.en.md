@@ -54,16 +54,15 @@ Before pushing changes to `main`, select **GitHub Actions** under Settings → P
 
 The `Showcase Pages` workflow builds and validates pull requests, and builds and deploys the `main` branch. The site packages recorded media and showcase pages with corresponding source links. Native dependencies and browser-playable builds are not published.
 
-Default destination: https://shabbywu.github.io/ultralight-py-showcase/. Check Actions and Pages settings for the actual deployment status.
+Default destination: https://ultralight-py-showcase.shabbywu.cn/. Check Actions and Pages settings for the actual deployment status.
 
 ### Sitemap
 
-The build generates [sitemap.xml](https://shabbywu.github.io/ultralight-py-showcase/sitemap.xml) with four canonical URLs: the Chinese and English homepages and license pages.
+The build generates [sitemap.xml](https://ultralight-py-showcase.shabbywu.cn/sitemap.xml) with four canonical URLs: the Chinese and English homepages and license pages.
 Root compatibility pages point to their Chinese counterparts through canonical links. Project fragments and assets are not separate sitemap entries.
 Every page includes absolute canonical, hreflang, and og:url metadata.
 
-Set the production address through `base_url` in `site/config.json`; the default includes the GitHub Pages project path.
-When moving to a custom domain, update that value and rebuild to refresh the sitemap and page metadata.
+The public address is hardcoded as `BASE_URL` in `scripts/build_site.py`: `https://ultralight-py-showcase.shabbywu.cn`. It is used for the sitemap and page search metadata. The reverse proxy uses GitHub Pages as its upstream; builds require no configuration file, environment variable, or command-line argument.
 After deployment, submit the complete sitemap URL in the site's Google Search Console property.
 
 ## Maintenance

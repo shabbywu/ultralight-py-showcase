@@ -14,6 +14,7 @@ from urllib.parse import unquote, urlsplit
 from xml.etree import ElementTree
 
 ROOT = Path(__file__).resolve().parents[1]
+BASE_URL = "https://ultralight-py-showcase.shabbywu.cn"
 LOCALES = ("zh-CN", "en")
 TOKEN = re.compile(r"\{\{([A-Za-z_]+)\}\}")
 
@@ -278,18 +279,7 @@ def validate(output: Path) -> None:
 
 def build(source: Path, output: Path) -> None:
     projects, catalogs = read_content(source)
-    config = json.loads((source / "config.json").read_text(encoding="utf-8"))
-    base_url = config["base_url"].rstrip("/")
-    address = urlsplit(base_url)
-    if (
-        address.scheme != "https"
-        or not address.hostname
-        or address.username
-        or address.password
-        or address.query
-        or address.fragment
-    ):
-        raise ValueError("site/config.json base_url must be an absolute HTTPS URL without query or fragment")
+    base_url = BASE_URL
     template = (source / "index.html").read_text(encoding="utf-8")
     if output.exists():
         shutil.rmtree(output)
