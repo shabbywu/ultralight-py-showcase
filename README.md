@@ -56,6 +56,16 @@ examples/pianoscope/        原生钢琴练习播放器、MusicXML 曲目与导�
 
 默认目标地址：https://shabbywu.github.io/ultralight-py-showcase/ 。实际发布状态以 Actions 与 Pages 设置为准。
 
+### 站点地图
+
+构建自动生成 [sitemap.xml](https://shabbywu.github.io/ultralight-py-showcase/sitemap.xml)，包含中英文首页及许可页，共 4 个正式 URL。
+根目录兼容页面通过 canonical 指向中文对应页；项目锚点与素材文件不单独列入站点地图。
+各页面同时输出绝对地址的 canonical、hreflang 和 og:url。
+
+正式地址集中配置在 `site/config.json` 的 `base_url`，当前保留 GitHub Pages 项目子路径。
+以后使用自定义域名时，更新此值并重新构建即可同步站点地图及页面元数据。
+站点上线后，在 Google Search Console 的对应资源中提交上述站点地图完整地址。
+
 ## 维护
 
 新增或更新示例参见 [接入指南](CONTRIBUTING.md)；运行、测试与平台验证说明见各示例 README。

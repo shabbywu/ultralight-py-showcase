@@ -56,6 +56,16 @@ The `Showcase Pages` workflow builds and validates pull requests, and builds and
 
 Default destination: https://shabbywu.github.io/ultralight-py-showcase/. Check Actions and Pages settings for the actual deployment status.
 
+### Sitemap
+
+The build generates [sitemap.xml](https://shabbywu.github.io/ultralight-py-showcase/sitemap.xml) with four canonical URLs: the Chinese and English homepages and license pages.
+Root compatibility pages point to their Chinese counterparts through canonical links. Project fragments and assets are not separate sitemap entries.
+Every page includes absolute canonical, hreflang, and og:url metadata.
+
+Set the production address through `base_url` in `site/config.json`; the default includes the GitHub Pages project path.
+When moving to a custom domain, update that value and rebuild to refresh the sitemap and page metadata.
+After deployment, submit the complete sitemap URL in the site's Google Search Console property.
+
 ## Maintenance
 
 See the [integration guide](CONTRIBUTING.md) for adding or updating examples, and each example's README for execution, testing, and platform validation instructions.

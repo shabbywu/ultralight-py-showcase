@@ -11,6 +11,7 @@ from html import escape
 from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
+from xml.etree import ElementTree
 
 ROOT = Path(__file__).resolve().parents[1]
 LOCALES = ("zh-CN", "en")
@@ -19,6 +20,54 @@ TOKEN = re.compile(r"\{\{([A-Za-z_]+)\}\}")
 
 def e(value: object) -> str:
     return escape(str(value), quote=True)
+
+
+def site_url(base_url: str, locale: str, page: str = "") -> str:
+    return f"{base_url}/{locale}/{page}"
+
+
+def search_metadata(base_url: str, locale: str, page: str = "") -> str:
+    canonical = e(site_url(base_url, locale, page))
+    alternates = "".join(
+        f'<link rel="alternate" hreflang="{code}" href="{e(site_url(base_url, code, page))}">'
+        for code in LOCALES
+    )
+    return (
+        f'<link rel="canonical" href="{canonical}">'
+        f'<meta property="og:url" content="{canonical}">'
+        f'{alternates}<link rel="alternate" hreflang="x-default" '
+        f'href="{e(site_url(base_url, "zh-CN", page))}">'
+        f'<link rel="sitemap" type="application/xml" href="{e(base_url)}/sitemap.xml">'
+    )
+
+
+def write_sitemap(base_url: str, output: Path) -> None:
+    namespace = "http://www.sitemaps.org/schemas/sitemap/0.9"
+    ElementTree.register_namespace("", namespace)
+    root = ElementTree.Element(f"{{{namespace}}}urlset")
+    for locale in LOCALES:
+        for page in ("", "licenses.html"):
+            node = ElementTree.SubElement(root, f"{{{namespace}}}url")
+            ElementTree.SubElement(node, f"{{{namespace}}}loc").text = site_url(base_url, locale, page)
+    ElementTree.indent(root, space="  ")
+    ElementTree.ElementTree(root).write(
+        output / "sitemap.xml", encoding="utf-8", xml_declaration=True
+    )
+
+
+def validate_sitemap(base_url: str, output: Path) -> None:
+    sitemap = ElementTree.parse(output / "sitemap.xml")
+    urls = [node.text for node in sitemap.findall("{*}url/{*}loc")]
+    expected = {site_url(base_url, locale, page) for locale in LOCALES for page in ("", "licenses.html")}
+    if len(urls) != len(expected) or set(urls) != expected:
+        raise ValueError("Sitemap must contain each canonical localized page exactly once")
+    for url in urls:
+        relative = url.removeprefix(base_url + "/")
+        path = output / relative
+        if path.is_dir():
+            path /= "index.html"
+        if not path.is_file():
+            raise ValueError(f"Missing sitemap target: {url}")
 
 
 def render(template: str, messages: dict, **raw: str) -> str:
@@ -166,7 +215,7 @@ def project_card(
 </article>'''
 
 
-def license_page(locale: str, prefix: str, t: dict, projects: list[dict]) -> str:
+def license_page(locale: str, prefix: str, t: dict, projects: list[dict], base_url: str) -> str:
     items = "".join(
         f'<section class="license-item"><h2>{e(p["title"])}</h2><a href="{e(prefix + p["license"])}">{e(p["license_label"][locale])} ↗</a>'
         f'<p><a href="{e(p["source"])}">{e(t["source"])} ↗</a></p>'
@@ -178,7 +227,7 @@ def license_page(locale: str, prefix: str, t: dict, projects: list[dict]) -> str
         + "</section>"
         for p in projects
     )
-    return f'''<!doctype html><html lang="{locale}" data-locale="{locale}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{e(t["license_title"])} · ultralight-py</title><link rel="stylesheet" href="{prefix}assets/style.css"><link rel="icon" href="{prefix}assets/favicon.svg"><script src="{prefix}assets/app.js" defer></script></head>
+    return f'''<!doctype html><html lang="{locale}" data-locale="{locale}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{e(t["license_title"])} · ultralight-py</title>{search_metadata(base_url, locale, "licenses.html")}<link rel="stylesheet" href="{prefix}assets/style.css"><link rel="icon" href="{prefix}assets/favicon.svg"><script src="{prefix}assets/app.js" defer></script></head>
 <body><header class="shell bar"><a href="./">← {e(t["back"])}</a><div class="language" role="group" aria-label="{e(t["language"])}">{locale_nav(locale, prefix, "licenses.html")}</div></header><main class="shell license-main"><p class="eyebrow">ULTRALIGHT-PY / SHOWCASE</p><h1>{e(t["license_title"])}</h1><p>{e(t["license_description"])}</p><p>{e(t["license_code"])}</p><div class="license-list">{items}</div></main></body></html>'''
 
 
@@ -229,6 +278,18 @@ def validate(output: Path) -> None:
 
 def build(source: Path, output: Path) -> None:
     projects, catalogs = read_content(source)
+    config = json.loads((source / "config.json").read_text(encoding="utf-8"))
+    base_url = config["base_url"].rstrip("/")
+    address = urlsplit(base_url)
+    if (
+        address.scheme != "https"
+        or not address.hostname
+        or address.username
+        or address.password
+        or address.query
+        or address.fragment
+    ):
+        raise ValueError("site/config.json base_url must be an absolute HTTPS URL without query or fragment")
     template = (source / "index.html").read_text(encoding="utf-8")
     if output.exists():
         shutil.rmtree(output)
@@ -245,6 +306,7 @@ def build(source: Path, output: Path) -> None:
             LANG=locale,
             ENTRY="false" if directory else "true",
             PREFIX=prefix,
+            SEARCH_METADATA=search_metadata(base_url, locale),
             LOCALE_NAV=locale_nav(locale, prefix),
             PROJECT_INDEX="".join(
                 f'<a href="#{e(p["id"])}">{i:02}<span>{e(p["title"])}</span></a>'
@@ -258,9 +320,10 @@ def build(source: Path, output: Path) -> None:
         )
         (folder / "index.html").write_text(html, encoding="utf-8")
         (folder / "licenses.html").write_text(
-            license_page(locale, prefix, t, projects), encoding="utf-8"
+            license_page(locale, prefix, t, projects, base_url), encoding="utf-8"
         )
     (output / ".nojekyll").touch()
+    write_sitemap(base_url, output)
     # Keep stable file paths while invalidating cached assets after an update.
     versions = {
         name: hashlib.sha256((output / "assets" / name).read_bytes()).hexdigest()[:12]
@@ -273,9 +336,10 @@ def build(source: Path, output: Path) -> None:
             page.read_text(encoding="utf-8"),
         )
         page.write_text(html, encoding="utf-8")
+    validate_sitemap(base_url, output)
     validate(output)
     print(
-        f"Built {len(projects)} projects × 2 locales; recorded showcase media; links, translations and animation frames verified: {output}"
+        f"Built {len(projects)} projects × 2 locales; sitemap with 4 canonical URLs; recorded showcase media; links, translations and animation frames verified: {output}"
     )
 
 
