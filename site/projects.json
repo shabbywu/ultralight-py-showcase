@@ -2,23 +2,33 @@
   {
     "id": "emberkeep",
     "title": "Emberkeep",
+    "details": {
+      "zh-CN": [
+        "这个示例将 Python 游戏逻辑与 JavaScript Canvas 界面放进同一个原生桌面窗口。回合规则、战斗和存档由 Python 处理，前端负责地牢画面与交互展示，展示 Web 技术如何成为 Python 游戏的界面层。",
+        "观看真实录制了解提灯探索、移动与战斗，或放大截图查看像素地牢和角色状态。源码、运行步骤与发行版本由独立 Emberkeep 仓库维护。"
+      ],
+      "en": [
+        "This example brings Python game logic and a JavaScript Canvas interface into one native desktop window. Python handles turns, combat, and saves, while the frontend renders the dungeon and its interactions: a practical example of using web technology as a Python game UI.",
+        "Watch the native recording for lantern-lit exploration, movement, and combat, or open the screenshot to inspect the dungeon and character stats. The independent Emberkeep repository maintains source code, run instructions, and releases."
+      ]
+    },
     "kind": {
-      "zh-CN": "像素地牢 / 桌面游戏",
-      "en": "Pixel dungeon / Game"
+      "zh-CN": "Python 游戏 / Canvas 像素地牢",
+      "en": "Python game / Canvas dungeon"
     },
     "description": {
-      "zh-CN": "提起灯笼，走进由 Python 驱动的像素地牢。回合规则、战斗与存档来自 Python，像素世界由 Canvas 呈现。",
-      "en": "Pick up a lantern. Explore a dungeon powered by Python, with turn-based combat and saves behind a Canvas interface."
+      "zh-CN": "Emberkeep 是使用 ultralight-py 构建的 Python 像素地牢桌面游戏。Python 负责回合规则、战斗与存档，JavaScript 与 Canvas 呈现提灯探索的像素世界。",
+      "en": "Emberkeep is a Python pixel dungeon desktop game built with ultralight-py. Python handles turn-based combat and saves; JavaScript and Canvas render the lantern-lit world."
     },
     "features": {
       "zh-CN": [
-        "Canvas",
-        "Python 对象",
+        "Canvas 像素渲染",
+        "Python 游戏逻辑",
         "异步交互"
       ],
       "en": [
-        "Canvas",
-        "Python objects",
+        "Canvas pixel rendering",
+        "Python game logic",
         "Async interop"
       ]
     },
@@ -45,24 +55,34 @@
   {
     "id": "pianoscope",
     "title": "PianoScope",
+    "details": {
+      "zh-CN": [
+        "打开 MusicXML、XML 或受限的 MXL 乐谱，以 Canvas 2D 下落音符或按需排版的五线谱查看曲目。Python 准备播放数据，随包 SoundFont 提供钢琴声音，播放与高亮跟随设备 DAC 时钟。",
+        "练习时可使用 0.5×、0.75× 或原速播放，并设置 A/B 循环片段。支持导出 A4 PDF、原文件副本和 Type 1 MIDI；MIDI 目前仅用于导出，不接受 MIDI 输入。当前验证平台为 macOS ARM64，应用不提供演奏输入或评分。"
+      ],
+      "en": [
+        "Open MusicXML, XML, or supported MXL scores and follow Canvas 2D falling notes or sheet music laid out on demand. Python prepares playback data; a bundled SoundFont supplies piano audio, with playback and highlighting following the device DAC clock.",
+        "Practice at 0.5×, 0.75×, or the original speed and set A/B loop sections. Export A4 PDF, an original-file copy, or Type 1 MIDI. MIDI is export-only. The currently verified platform is macOS ARM64; performance input and scoring are not provided."
+      ]
+    },
     "kind": {
-      "zh-CN": "音乐可视化 / 钢琴练习",
-      "en": "Music / Piano practice"
+      "zh-CN": "MusicXML 播放器 / 钢琴练习",
+      "en": "MusicXML player / Piano practice"
     },
     "description": {
-      "zh-CN": "从 MusicXML 出发，听见音乐，也看见每一次触键。下落音符与五线谱共同跟随真实钢琴声音，支持慢练与片段循环。",
-      "en": "From MusicXML to sound. See every keystroke in falling notes or sheet music, with SoundFont piano playback, slower practice, and loops."
+      "zh-CN": "PianoScope 是基于 Python 与 ultralight-py 的 MusicXML 钢琴练习播放器。通过下落音符或五线谱跟随 SoundFont 钢琴播放，支持变速慢练、A/B 片段循环及 PDF、MIDI 导出。",
+      "en": "PianoScope is a MusicXML piano practice player built with Python and ultralight-py. Follow falling notes or sheet music with SoundFont playback, slower practice, A/B loops, and PDF or MIDI export."
     },
     "features": {
       "zh-CN": [
-        "MusicXML",
-        "SoundFont",
-        "Canvas 2D"
+        "MusicXML 乐谱",
+        "SoundFont 钢琴播放",
+        "下落音符与五线谱"
       ],
       "en": [
-        "MusicXML",
-        "SoundFont",
-        "Canvas 2D"
+        "MusicXML scores",
+        "SoundFont piano playback",
+        "Falling notes & sheet music"
       ]
     },
     "source": "https://github.com/shabbywu/ultralight-py-showcase/tree/main/examples/pianoscope",
@@ -88,24 +108,34 @@
   {
     "id": "bridge-lab",
     "title": "Bridge Lab",
+    "details": {
+      "zh-CN": [
+        "六类可编辑案例覆盖同步函数、asyncio Promise、实例、list 代理、异常和实时 dict。在 AppCore 原生窗口中修改两端代码并运行，查看真实结果、控制台日志和对象状态，无需 Node.js 或 Web 服务。",
+        "共享容器展示 Python list/dict 与 JavaScript Array/Object 的双向访问及引用身份。代码直接在当前桌面进程执行；安装依赖后可离线运行。运行指南还提供 CPU 渲染与原生冒烟检查方式。"
+      ],
+      "en": [
+        "Six editable examples cover synchronous functions, asyncio promises, instances, list proxies, exceptions, and live dictionaries. Edit both sides in an AppCore native window and inspect real results, console logs, and object state without Node.js or a web server.",
+        "Shared containers demonstrate two-way access between Python list/dict and JavaScript Array/Object while retaining reference identity. Code runs in the current desktop process. After dependency installation, the app works offline; the run guide also covers CPU rendering and native smoke checks."
+      ]
+    },
     "kind": {
-      "zh-CN": "双端编辑 / 桥接实验室",
+      "zh-CN": "Python / JavaScript 双向桥接",
       "en": "Python × JavaScript / Bridge lab"
     },
     "description": {
-      "zh-CN": "修改 Python 与 JavaScript，让桥接过程清晰可见。六个可编辑案例展示函数、异步 Promise、实时对象和容器、异常及快照。",
-      "en": "Edit both sides. See Python and JavaScript work together through six editable examples covering functions, promises, live proxies, errors, and snapshots."
+      "zh-CN": "Bridge Lab 是 ultralight-py 的 Python 与 JavaScript 双向桥接实验室。在原生桌面窗口中编辑并运行六个案例，探索同步函数、asyncio 与 Promise、对象及 list/dict 共享代理和异常处理。",
+      "en": "Bridge Lab explores Python–JavaScript interop with ultralight-py. Edit and run six examples in a native desktop window, covering functions, asyncio promises, shared object and list/dict proxies, and errors."
     },
     "features": {
       "zh-CN": [
         "实时对象代理",
-        "Promise",
-        "Console"
+        "asyncio / Promise",
+        "list / dict 双向共享"
       ],
       "en": [
         "Live object proxies",
-        "Promise",
-        "Console"
+        "asyncio / Promise",
+        "Shared list / dict"
       ]
     },
     "source": "https://github.com/shabbywu/ultralight-py-showcase/tree/main/examples/bridge-lab",
@@ -130,13 +160,23 @@
   {
     "id": "ashen-reliquary",
     "title": "Ashen Reliquary",
+    "details": {
+      "zh-CN": [
+        "使用 Vue 2、DOM 与 TypeScript 网格背包界面，完成拖动物品、R 键旋转、装备与卸装、堆叠合并及拆分、宝石镶嵌和快捷栏绑定。界面通过 ultralight-py 宿主桥接向 Python 提交预览与操作命令。",
+        "Python 后端持有物品身份、容器、装备和快捷栏的权威状态，事务提交后发送事件，Vue 再获取展示副本。默认使用内存存储，启动时传入 --state 路径可启用文件持久化；前端需先构建，再在原生桌面窗口中运行。"
+      ],
+      "en": [
+        "Use a Vue 2, DOM, and TypeScript grid inventory interface to drag and rotate items, equip gear, merge or split stacks, socket gems, and bind a quickbar. The UI sends preview and action commands to Python through the ultralight-py host bridge.",
+        "Python owns item identity, containers, equipment, and quickbar state. Committed transactions emit events so Vue can fetch detached display snapshots. Storage is in-memory by default; pass a --state path to enable file persistence. Build the frontend before running it in a native desktop window."
+      ]
+    },
     "kind": {
-      "zh-CN": "ARPG 装备 / 网格背包",
-      "en": "ARPG equipment / Grid inventory"
+      "zh-CN": "Python + Vue / ARPG 网格背包",
+      "en": "Python + Vue / ARPG inventory"
     },
     "description": {
-      "zh-CN": "整理遗物、穿戴装备、拆分堆叠并镶嵌宝石。Python 后端持有权威状态与规则，Vue 界面在收到后端事件后刷新展示副本。",
-      "en": "Arrange relics, equip gear, split stacks, and socket gems. Python owns the inventory state and rules; the Vue interface refreshes detached render snapshots after backend events."
+      "zh-CN": "Ashen Reliquary 是使用 ultralight-py、Python 与 Vue 构建的 ARPG 网格背包示例。支持拖拽旋转、装备、堆叠拆分、宝石镶嵌及快捷栏；Python 管理权威状态，Vue 按后端事件刷新界面。",
+      "en": "Ashen Reliquary is an ARPG grid inventory demo built with ultralight-py, Python, and Vue. Drag and rotate items, equip gear, split stacks, and socket gems; Python owns state while Vue refreshes on backend events."
     },
     "features": {
       "zh-CN": [

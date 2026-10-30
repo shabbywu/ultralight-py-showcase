@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="{{LANG}}" data-locale="{{LANG}}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{page_title}}</title>
+  <meta name="description" content="{{page_description}}">
+  <meta name="robots" content="index, follow, max-image-preview:large">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="{{page_title}}">
+  <meta property="og:description" content="{{page_description}}">
+  <meta property="og:site_name" content="ultralight-py Showcase">
+  <meta property="og:locale" content="{{OG_LOCALE}}">
+  <meta property="og:image" content="{{OG_IMAGE}}">
+  <meta property="og:image:alt" content="{{IMAGE_ALT}}">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{{page_title}}">
+  <meta name="twitter:description" content="{{page_description}}">
+  <meta name="twitter:image" content="{{OG_IMAGE}}">
+  {{SEARCH_METADATA}}
+  <link rel="icon" href="{{PREFIX}}assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="{{PREFIX}}assets/style.css">
+  <script src="{{PREFIX}}assets/app.js" defer></script>
+</head>
+<body>
+<header class="shell bar"><a href="../../">← {{back}}</a><div class="language" role="group" aria-label="{{language}}">{{LOCALE_NAV}}</div></header>
+<main class="shell sample-main">
+  <p class="eyebrow">ULTRALIGHT-PY / SHOWCASE</p>
+  <h1>{{PROJECT_TITLE}}</h1>
+  <p class="lead">{{page_description}}</p>
+  <section class="sample-details" aria-labelledby="implementation-title"><h2 id="implementation-title">{{implementation}}</h2>{{DETAILS}}</section>
+  <section aria-labelledby="demo-title"><h2 id="demo-title">{{sample_demo}}</h2><p class="media-note">{{motion_note}}</p>{{PROJECT}}</section>
+  <section class="sample-details" aria-labelledby="run-title"><h2 id="run-title">{{sample_run}}</h2><p>{{sample_run_note}}</p><div class="actions"><a class="button" href="{{GUIDE}}">{{guide}} ↗</a><a class="button outline" href="{{SOURCE}}">{{source}} ↗</a></div></section>
+  <nav class="sample-details" aria-label="{{other_samples}}"><h2>{{other_samples}}</h2><ul>{{RELATED}}</ul></nav>
+</main>
+<footer class="shell footer"><a href="../../">ultralight-py / Showcase</a><a href="../../licenses.html">{{licenses}} ↗</a></footer>
+<script type="application/json" id="site-messages">{{MESSAGES}}</script>
+<script type="application/ld+json">{{STRUCTURED_DATA}}</script>
+</body>
+</html>

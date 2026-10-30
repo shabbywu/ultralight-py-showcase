@@ -42,7 +42,11 @@ def search_metadata(base_url: str, locale: str, page: str = "") -> str:
     )
 
 
-def structured_data(base_url: str, locale: str, projects: list[dict]) -> str:
+def project_path(project: dict) -> str:
+    return f"samples/{project['id']}/"
+
+
+def structured_data(base_url: str, locale: str, projects: list[dict], detail: bool = False) -> str:
     items = []
     for index, project in enumerate(projects, 1):
         items.append({
@@ -54,11 +58,11 @@ def structured_data(base_url: str, locale: str, projects: list[dict]) -> str:
                 "applicationCategory": "DesktopApplication",
                 "description": project["description"][locale],
                 "image": f"{base_url}/{project['image']}",
-                "url": project["source"],
+                "url": site_url(base_url, locale, project_path(project)),
                 "codeRepository": project["source"],
             },
         })
-    return json.dumps({
+    data = {
         "@context": "https://schema.org",
         "@type": "CollectionPage",
         "name": "ultralight-py Showcase",
@@ -72,15 +76,24 @@ def structured_data(base_url: str, locale: str, projects: list[dict]) -> str:
             "programmingLanguage": "Python",
         },
         "mainEntity": {"@type": "ItemList", "itemListElement": items},
-    }, ensure_ascii=False).replace("<", "\\u003c")
+    }
+    if detail:
+        data.update({
+            "@type": "WebPage",
+            "name": projects[0]["title"],
+            "url": site_url(base_url, locale, project_path(projects[0])),
+            "description": projects[0]["description"][locale],
+            "mainEntity": items[0]["item"],
+        })
+    return json.dumps(data, ensure_ascii=False).replace("<", "\\u003c")
 
 
-def write_sitemap(base_url: str, output: Path) -> None:
+def write_sitemap(base_url: str, output: Path, projects: list[dict]) -> None:
     namespace = "http://www.sitemaps.org/schemas/sitemap/0.9"
     ElementTree.register_namespace("", namespace)
     root = ElementTree.Element(f"{{{namespace}}}urlset")
     for locale in LOCALES:
-        for page in ("", "licenses.html"):
+        for page in ("", "licenses.html", *(project_path(p) for p in projects)):
             node = ElementTree.SubElement(root, f"{{{namespace}}}url")
             ElementTree.SubElement(node, f"{{{namespace}}}loc").text = site_url(base_url, locale, page)
     ElementTree.indent(root, space="  ")
@@ -89,10 +102,11 @@ def write_sitemap(base_url: str, output: Path) -> None:
     )
 
 
-def validate_sitemap(base_url: str, output: Path) -> None:
+def validate_sitemap(base_url: str, output: Path, projects: list[dict]) -> None:
     sitemap = ElementTree.parse(output / "sitemap.xml")
     urls = [node.text for node in sitemap.findall("{*}url/{*}loc")]
-    expected = {site_url(base_url, locale, page) for locale in LOCALES for page in ("", "licenses.html")}
+    expected = {site_url(base_url, locale, page) for locale in LOCALES
+                for page in ("", "licenses.html", *(project_path(p) for p in projects))}
     if len(urls) != len(expected) or set(urls) != expected:
         raise ValueError("Sitemap must contain each canonical localized page exactly once")
     for url in urls:
@@ -181,11 +195,18 @@ def read_content(source: Path) -> tuple[list[dict], dict[str, dict]]:
             "features",
             "image_alt",
             "license_label",
+            "details",
         ):
             if set(project[field]) != set(LOCALES) or not all(project[field].values()):
                 raise ValueError(
                     f"Missing project translations: {project['id']}.{field}"
                 )
+        for locale in LOCALES:
+            paragraphs = project["details"][locale]
+            if not isinstance(paragraphs, list) or not paragraphs or any(
+                not isinstance(p, str) or not p.strip() for p in paragraphs
+            ):
+                raise ValueError(f"Missing project detail paragraphs: {project['id']}.{locale}")
         for key in ("source", "guide", "releases"):
             if key in project and urlsplit(project[key]).scheme != "https":
                 raise ValueError(f"Project links must use HTTPS: {key}")
@@ -207,7 +228,8 @@ def read_content(source: Path) -> tuple[list[dict], dict[str, dict]]:
 
 
 def project_card(
-    project: dict, locale: str, prefix: str, t: dict, source: Path, index: int
+    project: dict, locale: str, prefix: str, t: dict, source: Path, index: int,
+    detail: bool = False,
 ) -> str:
     title, slug = e(project["title"]), e(project["id"])
     image = e(prefix + project["image"])
@@ -228,6 +250,9 @@ def project_card(
         )
         if key in project
     )
+    if not detail:
+        links = (f'<a href="{prefix}{locale}/{project_path(project)}">'
+                 f'{e(t["sample_details"])} →</a>') + links
     motion = f'''
 <figure class="demo motion-demo" data-animation="{animation}" data-poster="{poster}" data-title="{title}">
   <figcaption><span class="media-title"><i class="media-dot" aria-hidden="true"></i>{e(t["animated"])}</span><span class="loop-label"><span aria-hidden="true">↻</span>{e(t["loop_preview"])}</span></figcaption>
@@ -314,6 +339,7 @@ def build(source: Path, output: Path) -> None:
     projects, catalogs = read_content(source)
     base_url = BASE_URL
     template = (source / "index.html").read_text(encoding="utf-8")
+    sample_template = (source / "project.html").read_text(encoding="utf-8")
     if output.exists():
         shutil.rmtree(output)
     shutil.copytree(source / "assets", output / "assets")
@@ -348,12 +374,39 @@ def build(source: Path, output: Path) -> None:
         (folder / "licenses.html").write_text(
             license_page(locale, prefix, t, projects, base_url), encoding="utf-8"
         )
+        if not directory:
+            continue
+        for index, project in enumerate(projects, 1):
+            sample_folder = folder / project_path(project)
+            sample_folder.mkdir(parents=True, exist_ok=True)
+            sample = render(
+                sample_template, t,
+                LANG=locale, PREFIX="../../../",
+                page_title=e(f'{project["title"]} — {project["kind"][locale]} | ultralight-py'),
+                page_description=e(project["description"][locale]),
+                PROJECT_TITLE=e(f'{project["title"]} — {project["kind"][locale]}'),
+                OG_LOCALE="zh_CN" if locale == "zh-CN" else "en_US",
+                OG_IMAGE=e(f'{base_url}/{project["image"]}'),
+                IMAGE_ALT=e(project["image_alt"][locale]),
+                SEARCH_METADATA=search_metadata(base_url, locale, project_path(project)),
+                LOCALE_NAV=locale_nav(locale, "../../../", project_path(project)),
+                DETAILS="".join(f'<p>{e(p)}</p>' for p in project["details"][locale]),
+                PROJECT=project_card(project, locale, "../../../", t, source, index, detail=True),
+                GUIDE=e(project["guide"]), SOURCE=e(project["source"]),
+                RELATED="".join(
+                    f'<li><a href="../{e(p["id"])}/">{e(p["title"])} — {e(p["kind"][locale])}</a></li>'
+                    for p in projects if p["id"] != project["id"]
+                ),
+                MESSAGES=messages,
+                STRUCTURED_DATA=structured_data(base_url, locale, [project], detail=True),
+            )
+            (sample_folder / "index.html").write_text(sample, encoding="utf-8")
     (output / ".nojekyll").touch()
     (output / "robots.txt").write_text(
         f"User-agent: *\nAllow: /\nSitemap: {base_url}/sitemap.xml\n",
         encoding="utf-8",
     )
-    write_sitemap(base_url, output)
+    write_sitemap(base_url, output, projects)
     # Keep stable file paths while invalidating cached assets after an update.
     versions = {
         name: hashlib.sha256((output / "assets" / name).read_bytes()).hexdigest()[:12]
@@ -366,10 +419,10 @@ def build(source: Path, output: Path) -> None:
             page.read_text(encoding="utf-8"),
         )
         page.write_text(html, encoding="utf-8")
-    validate_sitemap(base_url, output)
+    validate_sitemap(base_url, output, projects)
     validate(output)
     print(
-        f"Built {len(projects)} projects × 2 locales; sitemap with 4 canonical URLs; recorded showcase media; links, translations and animation frames verified: {output}"
+        f"Built {len(projects)} projects × 2 locales; sitemap with {2 * (2 + len(projects))} canonical URLs; recorded showcase media; links, translations and animation frames verified: {output}"
     )
 
 

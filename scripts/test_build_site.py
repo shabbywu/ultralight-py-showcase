@@ -63,8 +63,8 @@ class BuildTests(unittest.TestCase):
             (output / "robots.txt").read_text(),
             f"User-agent: *\nAllow: /\nSitemap: {build_site.BASE_URL}/sitemap.xml\n",
         )
-        build_site.validate_sitemap(build_site.BASE_URL, output)
         projects, _ = build_site.read_content(build_site.ROOT / "site")
+        build_site.validate_sitemap(build_site.BASE_URL, output, projects)
         for locale in build_site.LOCALES:
             html = (output / locale / "index.html").read_text()
             data = json.loads(re.search(
@@ -91,6 +91,29 @@ class BuildTests(unittest.TestCase):
         encoded = build_site.structured_data(build_site.BASE_URL, "en", malicious)
         self.assertNotIn("</script>", encoded)
         self.assertEqual(json.loads(encoded)["mainEntity"]["itemListElement"][0]["item"]["name"], malicious[0]["title"])
+
+    def test_sample_pages_are_localized_and_discoverable(self):
+        output = self.root / "dist"
+        build_site.build(build_site.ROOT / "site", output)
+        projects, _ = build_site.read_content(build_site.ROOT / "site")
+        for locale in build_site.LOCALES:
+            home = (output / locale / "index.html").read_text()
+            for project in projects:
+                path = build_site.project_path(project)
+                self.assertIn(f'href="../{locale}/{path}"', home)
+                html = (output / locale / path / "index.html").read_text()
+                self.assertEqual(html.count("<h1>"), 1)
+                self.assertIn(f'rel="canonical" href="{build_site.BASE_URL}/{locale}/{path}"', html)
+                for code in build_site.LOCALES:
+                    self.assertIn(f'hreflang="{code}" href="{build_site.BASE_URL}/{code}/{path}"', html)
+                for paragraph in project["details"][locale]:
+                    self.assertIn(build_site.e(paragraph), html)
+                data = json.loads(re.search(
+                    r'<script type="application/ld\+json">(.*?)</script>', html, re.S
+                )[1])
+                self.assertEqual(data["mainEntity"]["name"], project["title"])
+                self.assertEqual(data["mainEntity"]["url"], data["url"])
+        build_site.validate(output)
 
     def test_changed_styles_invalidate_cached_assets_on_every_page(self):
         source = self.source_copy()

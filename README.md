@@ -58,10 +58,11 @@ examples/pianoscope/        原生钢琴练习播放器、MusicXML 曲目与导�
 
 ### 站点地图
 
-构建自动生成 [sitemap.xml](https://ultralight-py-showcase.shabbywu.cn/sitemap.xml)，包含中英文首页及许可页，共 4 个正式 URL。
+构建自动生成 [sitemap.xml](https://ultralight-py-showcase.shabbywu.cn/sitemap.xml)，包含中英文首页、许可页及四个示例详情页，共 12 个正式 URL。
 根目录兼容页面通过 canonical 指向中文对应页；项目锚点与素材文件不单独列入站点地图。
 各页面同时输出绝对地址的 canonical、hreflang 和 og:url。
 构建也会生成 `robots.txt` 并声明站点地图；首页输出中英文搜索摘要、Open Graph / Twitter 分享卡片及 `CollectionPage` / `ItemList` / 软件示例 JSON-LD，帮助搜索引擎理解页面与示例。分享图使用真实 Bridge Lab 截图，许可页另有独立描述。
+各示例详情页位于 `zh-CN/samples/<id>/` 与 `en/samples/<id>/`，包含双语功能介绍、原生演示、运行指南和相关示例内链，并输出各自的 canonical、hreflang、截图分享卡片和软件结构化数据。内容来自 `site/projects.json`，新增示例时须同时维护两种语言的 `details` 段落。
 
 公开地址固定为 `scripts/build_site.py` 中的 `BASE_URL`：`https://ultralight-py-showcase.shabbywu.cn`，用于生成站点地图及页面搜索元数据。反向代理回源 GitHub Pages；构建无需配置文件、环境变量或命令行参数。
 站点上线后，在 Google Search Console 的对应资源中提交上述站点地图完整地址。
