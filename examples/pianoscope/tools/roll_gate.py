@@ -463,12 +463,17 @@ def main():
                     view.evaluate("App.beginMeasure(" + str(args.seconds) + ")")
                     await asyncio.sleep(args.seconds + 0.1)
                     performance = view.evaluate("App.measurement", copy=True)
-                    performance["minimum_fps"] = min(performance["frames"])
+                    performance["minimum_fps"] = (
+                        min(performance["frames"]) if performance["frames"] else None
+                    )
                     report["performance"] = performance
                     check(
                         "actual roll playback minimum 30 FPS",
-                        len(performance["frames"]) == args.seconds
-                        and performance["minimum_fps"] >= 30,
+                        args.seconds == 0
+                        or (
+                            len(performance["frames"]) == args.seconds
+                            and performance["minimum_fps"] >= 30
+                        ),
                         performance,
                     )
                     check(

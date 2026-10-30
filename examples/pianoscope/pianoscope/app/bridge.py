@@ -59,6 +59,7 @@ def register(api: PianoAPI, controller: Controller) -> None:
         "set_loop",
         "get_transport",
         "get_analysis",
+        "get_ui_snapshot",
         "preview_hands",
         "apply_hands",
         "undo_hands",

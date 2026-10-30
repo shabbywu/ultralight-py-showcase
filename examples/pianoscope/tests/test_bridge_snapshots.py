@@ -91,3 +91,44 @@ def test_score_load_does_not_leave_shared_settings_in_worker(controller, monkeyp
     assert received == dict(nested=dict(flags=[True]))
     assert type(received["nested"]) is dict
     assert type(received["nested"]["flags"]) is list
+
+
+def test_ui_snapshot_reuses_analysis_until_audio_changes(controller):
+    first = controller.get_ui_snapshot(True)
+    second = controller.get_ui_snapshot(True)
+    assert first["transport"]["seq"] < second["transport"]["seq"]
+    assert first["analysis"]["seq"] == second["analysis"]["seq"]
+
+    controller.audio.serial += 1
+    third = controller.get_ui_snapshot(True)
+    assert third["analysis"]["seq"] > second["analysis"]["seq"]
+
+
+def test_semantic_parse_cache_is_bounded_and_reuses_same_settings(
+    controller, monkeypatch
+):
+    import pianoscope.app.controller as session
+    from pianoscope.score.source import source_from_bytes
+
+    source = source_from_bytes(
+        b'<score-partwise version="4.0"><part-list><score-part id="P"/>'
+        b'</part-list><part id="P"><measure number="1"><attributes>'
+        b"<divisions>1</divisions><time><beats>4</beats><beat-type>4</beat-type>"
+        b"</time><staves>2</staves><clef><sign>G</sign></clef><clef number='2'>"
+        b"<sign>F</sign></clef></attributes><sound tempo='120'/><note id='n'>"
+        b"<pitch><step>C</step><octave>4</octave></pitch><duration>4</duration>"
+        b"<voice>1</voice><type>whole</type><staff>1</staff></note></measure>"
+        b"</part></score-partwise>"
+    )
+    calls = 0
+    real_parse = session.parse_score
+
+    def counted(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        return real_parse(*args, **kwargs)
+
+    monkeypatch.setattr(session, "parse_score", counted)
+    controller._cached_parse(source, {}, lambda: False)
+    controller._cached_parse(source, {}, lambda: False)
+    assert calls == 1

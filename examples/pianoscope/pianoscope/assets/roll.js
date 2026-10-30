@@ -10,6 +10,7 @@ class PianoRollRenderer {
     if(preference.addEventListener)preference.addEventListener('change',changed);
     else if(preference.addListener)preference.addListener(changed);
     this.notes=[];this.byId=new Map();this.nextOnset=new Map();this.revision=null;
+    this.noteOrder=new Map();this.noteBuckets=new Map();this.longNotes=[];this.bucketSeconds=2;
     this.previous=null;this.seen=new Set();this.particles=[];this.pulses=[];
     this.impactCount=0;this.history=[];this.lastCells=[];this.viewport='';
     this.background=null;this.textures=null;this.palette=new Set();
@@ -18,6 +19,16 @@ class PianoRollRenderer {
 
   setNotes(notes, revision) {
     this.notes=notes;this.revision=revision;this.byId=new Map(notes.map(n=>[n.id,n]));
+    this.noteOrder=new Map(notes.map((n,i)=>[n.id,i]));
+    this.noteBuckets=new Map();this.longNotes=[];
+    for(const n of notes){
+      const first=Math.floor(n.onset_s/this.bucketSeconds),last=Math.floor(n.key_off_s/this.bucketSeconds);
+      if(last-first>32){this.longNotes.push(n);continue;}
+      for(let bucket=first;bucket<=last;bucket++){
+        if(!this.noteBuckets.has(bucket))this.noteBuckets.set(bucket,[]);
+        this.noteBuckets.get(bucket).push(n);
+      }
+    }
     this.palette=new Set(notes.map(n=>this.colors[n.hand]||this.colors.unassigned));
     this.nextOnset.clear();
     const pitches=new Map();
@@ -94,7 +105,12 @@ class PianoRollRenderer {
 
   geometry(layout, time, line, height, pps) {
     const cells=[];
-    for(const n of this.notes) {
+    const lower=time+(line-height)/pps,upper=time+line/pps,candidates=new Set(this.longNotes);
+    for(let bucket=Math.floor(lower/this.bucketSeconds)-1;bucket<=Math.floor(upper/this.bucketSeconds)+1;bucket++){
+      for(const n of this.noteBuckets.get(bucket)||[])candidates.add(n);
+    }
+    const ordered=Array.from(candidates).sort((a,b)=>this.noteOrder.get(a.id)-this.noteOrder.get(b.id));
+    for(const n of ordered) {
       const key=layout.byMidi[n.pitch];if(!key)continue;
       const naturalTop=line-(n.key_off_s-time)*pps,bottom=line-(n.onset_s-time)*pps;
       if(bottom<0||naturalTop>height)continue;

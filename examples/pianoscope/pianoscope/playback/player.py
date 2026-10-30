@@ -9,6 +9,7 @@ from typing import Concatenate, ParamSpec, TypeVar
 
 from pianoscope.playback.audio import Audio
 from pianoscope.playback.budget import require_pcm_budget
+from pianoscope.playback.model import Score
 from pianoscope.playback.render import audible_notes, render
 from pianoscope.playback.types import PCM, PlaybackConfig
 from pianoscope.score.mapping import json_value
@@ -19,6 +20,63 @@ from pianoscope.types import Record
 P = ParamSpec("P")
 R = TypeVar("R")
 Player = TypeVar("Player", bound="ScorePlayer")
+
+
+class _TransportIndex:
+    """Incremental active-note index for the UI transport snapshot."""
+
+    def __init__(self, score: Score, config: PlaybackConfig) -> None:
+        self.notes = tuple(audible_notes(score, config))
+        self.note_by_id = {note.id: note for note in self.notes}
+        self.order = {note.id: index for index, note in enumerate(self.notes)}
+        events = []
+        for note in self.notes:
+            events.extend(
+                (
+                    (note.start_s, 2, note.id),
+                    (note.key_off_s, 0, note.id),
+                    (note.sustain_end_s, 1, note.id),
+                )
+            )
+        self.events = tuple(sorted(events, key=lambda item: (item[0], item[1])))
+        self.event_index = 0
+        self.last_seconds: float | None = None
+        self.active: set[str] = set()
+        self.sustained: set[str] = set()
+
+    def _reset(self) -> None:
+        self.event_index = 0
+        self.last_seconds = None
+        self.active.clear()
+        self.sustained.clear()
+
+    def _apply(self, kind: int, ident: str) -> None:
+        if kind == 2:
+            self.active.add(ident)
+        elif kind == 0:
+            self.active.discard(ident)
+            note = self.note_by_id.get(ident)
+            if note and note.sustain_end_s > note.key_off_s:
+                self.sustained.add(ident)
+        else:
+            self.sustained.discard(ident)
+
+    def at(self, seconds: float, enabled: bool) -> tuple[list[str], list[str]]:
+        if not enabled:
+            self._reset()
+            return [], []
+        if self.last_seconds is not None and seconds < self.last_seconds:
+            self._reset()
+        while self.event_index < len(self.events):
+            time, kind, ident = self.events[self.event_index]
+            if time > seconds:
+                break
+            self._apply(kind, ident)
+            self.event_index += 1
+        self.last_seconds = seconds
+        active = sorted(self.active, key=self.order.__getitem__)
+        sustained = sorted(self.sustained, key=self.order.__getitem__)
+        return active, sustained
 
 
 def serialized(
@@ -57,6 +115,8 @@ class ScorePlayer:
         self.score = None
         self.config = None
         self.seq = 0
+        self._transport_index: _TransportIndex | None = None
+        self._transport_index_key: tuple[int, int] | None = None
         self.closed = False
         self.phase = "empty"
         self.command_lock = asyncio.Lock()
@@ -74,7 +134,17 @@ class ScorePlayer:
         self.audio.install(pcm, 1.0, plan.duration_s, 0.0)
         self.audio.loop = dict(enabled=False, a_s=0.0, b_s=min(plan.duration_s, 4.0))
         self.plan, self.score, self.config = plan, score, config
+        self._rebuild_transport_index()
         self.phase = "ready"
+
+    def _rebuild_transport_index(self) -> None:
+        """Build the active-note index after a score or audible config changes."""
+        if self.score is None or self.config is None:
+            self._transport_index = None
+            self._transport_index_key = None
+            return
+        self._transport_index = _TransportIndex(self.score, self.config)
+        self._transport_index_key = (id(self.score), id(self.config))
 
     @serialized
     async def play(self) -> Record:
@@ -196,6 +266,7 @@ class ScorePlayer:
         position = await self.audio.fade_halt()
         self.audio.install(pcm, config["rate"], self.plan.duration_s, position)
         self.config = config
+        self._rebuild_transport_index()
         if was_playing:
             self.audio.start()
         return self.get_transport()
@@ -221,24 +292,25 @@ class ScorePlayer:
             self.phase = "ended"
         self.seq += 1
         plan = self.plan
-        audible = (
-            audible_notes(self.score, self.config) if self.score is not None else []
+        if self._transport_index is None or self._transport_index_key != (
+            id(self.score),
+            id(self.config),
+        ):
+            self._rebuild_transport_index()
+        active, sustained = (
+            self._transport_index.at(
+                seconds, self.audio.playing and self.audio.volume > 0
+            )
+            if self._transport_index is not None
+            else ([], [])
         )
-        active = (
-            [n.id for n in audible if n.start_s <= seconds < n.key_off_s]
-            if self.audio.playing and self.audio.volume > 0
-            else []
-        )
-        sustained = (
-            [n.id for n in audible if n.key_off_s <= seconds < n.sustain_end_s]
-            if self.audio.playing and self.audio.volume > 0
-            else []
-        )
+        active_set = set(active)
         spans = (
             [
                 s
                 for s in plan.display_spans
-                if s["instance_id"] in active and s["start_s"] <= seconds < s["end_s"]
+                if s["instance_id"] in active_set
+                and s["start_s"] <= seconds < s["end_s"]
             ]
             if plan
             else []

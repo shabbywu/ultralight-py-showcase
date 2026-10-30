@@ -10,7 +10,9 @@ import os
 import shutil
 import tempfile
 import threading
+import time
 import uuid
+from collections import OrderedDict
 from collections.abc import AsyncIterator, Iterator
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager, contextmanager
@@ -28,7 +30,7 @@ from pianoscope.playback.render import audible_notes, render
 from pianoscope.playback.types import PCM, AudibleEvent, Overview, PlaybackConfig
 from pianoscope.score.mapping import json_value
 from pianoscope.score.midi import compile_midi, sound_score
-from pianoscope.score.model import parse_score
+from pianoscope.score.model import ScoreDocument, parse_score
 from pianoscope.score.plan import compile_plan
 from pianoscope.score.process import run_preparation
 from pianoscope.score.source import SourceDocument, read_source
@@ -47,6 +49,8 @@ class Controller(ScorePlayer):
             max_workers=2, thread_name_prefix="pianoscope-score"
         )
         self.preparation_lock = threading.Lock()
+        self.semantic_cache_lock = threading.Lock()
+        self.semantic_cache: OrderedDict[str, ScoreDocument] = OrderedDict()
         self.jobs, self.paths, self.targets = {}, {}, {}
         self.candidates, self.confirmations, self.layout_candidates = {}, {}, {}
         self.current_layout_job = None
@@ -58,8 +62,31 @@ class Controller(ScorePlayer):
         self.hand_preview = None
         self.hand_history = []
         self.analysis_seq = 0
+        self._analysis_cache_key: tuple[int, int, bool, float] | None = None
+        self._analysis_cache: Record | None = None
         self.workspace = work_root() / "jobs"
         self.workspace.mkdir(parents=True, exist_ok=True)
+
+    def _cached_parse(
+        self, source: SourceDocument, settings: Record, cancelled: Cancelled
+    ) -> ScoreDocument:
+        """Reuse bounded immutable semantic parses for repeated opens/confirmations."""
+        fingerprint = json.dumps(
+            settings, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        )
+        key = source.sha256 + ":" + fingerprint
+        with self.semantic_cache_lock:
+            cached = self.semantic_cache.get(key)
+            if cached is not None:
+                self.semantic_cache.move_to_end(key)
+                return copy.deepcopy(cached)
+        document = parse_score(source, settings, cancelled)
+        with self.semantic_cache_lock:
+            self.semantic_cache[key] = copy.deepcopy(document)
+            self.semantic_cache.move_to_end(key)
+            while len(self.semantic_cache) > 2:
+                self.semantic_cache.popitem(last=False)
+        return document
 
     def token_for_path(self, path: PathInput) -> str:
         """登记真实路径并返回不透明令牌；路径仅保存在 Python 侧。"""
@@ -168,6 +195,7 @@ class Controller(ScorePlayer):
             folder=folder,
             source_path=path,
             settings=settings,
+            timings={},
         )
         self.jobs[jid] = job
         self.current_job = jid
@@ -181,8 +209,12 @@ class Controller(ScorePlayer):
             with self._preparing(check):
                 if check():
                     raise InterruptedError("已取消")
+                started = time.perf_counter()
                 source = snapshot or read_source(path, check)
-                document = parse_score(source, settings, check)
+                job["timings"]["read_s"] = time.perf_counter() - started
+                started = time.perf_counter()
+                document = self._cached_parse(source, settings, check)
+                job["timings"]["parse_s"] = time.perf_counter() - started
                 document.revision += ":" + jid
                 if document.needs_confirmation:
                     return dict(
@@ -192,8 +224,12 @@ class Controller(ScorePlayer):
                         title=document.title,
                     )
                 job["phase"] = "compiling"
+                started = time.perf_counter()
                 plan = compile_plan(document, settings, check)
+                job["timings"]["plan_s"] = time.perf_counter() - started
+                started = time.perf_counter()
                 compile_midi(plan)
+                job["timings"]["midi_s"] = time.perf_counter() - started
                 # Playback can publish without engraving. No native notation
                 # worker, PDF, page image, or image decode runs on this path.
                 result = dict(manifest=dict(layout_revision=None, pages=[]))
@@ -213,16 +249,21 @@ class Controller(ScorePlayer):
                 )
                 require_pcm_budget(count, current_bytes)
                 rendered_sample_rate = self.audio.sample_rate
+                started = time.perf_counter()
                 pcm = render(sound_score(plan), config, rendered_sample_rate, check)
+                job["timings"]["render_s"] = time.perf_counter() - started
                 if check():
                     raise InterruptedError("已取消")
+                started = time.perf_counter()
+                waveform = overview(pcm, 1400)
+                job["timings"]["overview_s"] = time.perf_counter() - started
                 return dict(
                     plan=plan,
                     pcm=pcm,
                     data=result,
                     folder=folder,
                     source_path=path,
-                    overview=overview(pcm, 1400),
+                    overview=waveform,
                     config=config,
                     sample_rate=rendered_sample_rate,
                 )
@@ -340,6 +381,7 @@ class Controller(ScorePlayer):
                 "source_sha256",
                 "title",
                 "filename",
+                "timings",
             )
             if k in job
         }
@@ -359,6 +401,7 @@ class Controller(ScorePlayer):
                 future = job.pop("future", None)
                 if future is not None:
                     future.cancel()
+                    future.add_done_callback(lambda _: self._cleanup_job_folder(job))
         return True
 
     def confirm_score_load(
@@ -724,6 +767,28 @@ class Controller(ScorePlayer):
             clock_epoch=self.audio.epoch,
         )
 
+    def get_ui_snapshot(self, include_analysis: bool = False) -> Record:
+        """返回一次 UI 所需的传输与可选声音分析快照。"""
+        result: Record = dict(transport=self.get_transport(), analysis=None)
+        if not include_analysis:
+            return result
+        key = (
+            self.audio.epoch,
+            self.audio.serial,
+            self.audio.playing,
+            self.audio.volume,
+        )
+        if self._analysis_cache_key != key or self._analysis_cache is None:
+            self.analysis_seq += 1
+            self._analysis_cache = dict(
+                analyze(self.audio.heard_window(), self.audio.sample_rate),
+                seq=self.analysis_seq,
+                clock_epoch=self.audio.epoch,
+            )
+            self._analysis_cache_key = key
+        result["analysis"] = dict(self._analysis_cache)
+        return result
+
     def get_transport(self) -> Record:
         """在基础 DAC 传输状态上附曲目世代、谱面版本与手别确认状态。"""
         result = super().get_transport()
@@ -826,6 +891,7 @@ class Controller(ScorePlayer):
                 if cancelled():
                     raise ValueError("试听已过期")
                 self.config = config
+                self._rebuild_transport_index()
                 return self.get_transport()
 
         def work() -> PCM:
@@ -849,6 +915,7 @@ class Controller(ScorePlayer):
                         raise ValueError("试听已过期")
                     self.audio.install(pcm, config["rate"], plan.duration_s, position)
                     self.config = config
+                    self._rebuild_transport_index()
                     self.active["sample_rate"] = self.audio.sample_rate
                     if self.phase == "playing":
                         self.audio.start()
@@ -1019,6 +1086,7 @@ class Controller(ScorePlayer):
                     dict(assignments),
                     config,
                 )
+                self._rebuild_transport_index()
                 self.active["plan"] = next_plan
                 return
 
@@ -1052,6 +1120,7 @@ class Controller(ScorePlayer):
                         dict(assignments),
                         config,
                     )
+                    self._rebuild_transport_index()
                     self.active["plan"] = next_plan
                     self.active["sample_rate"] = self.audio.sample_rate
                     if self.phase == "playing":
@@ -1276,18 +1345,23 @@ class Controller(ScorePlayer):
                     self.audio.set_position(position)
                 return self.get_transport()
 
+    def _cleanup_job_folder(self, job: Record) -> None:
+        """Remove a job directory once no active snapshot still references it."""
+        folder = job.get("folder")
+        active_folders = (
+            {self.active["folder"], self.active.get("layout_folder")}
+            if self.active
+            else set()
+        )
+        if folder and folder not in active_folders:
+            shutil.rmtree(folder, ignore_errors=True)
+
     def _prune(self) -> None:
         """清理较早的已完成作业及无活动引用的临时目录，保留当前源与谱面。"""
         for jid, job in list(self.jobs.items())[:-16]:
             if job["done"] and "future" not in job:
                 del self.jobs[jid]
-                folder = job.get("folder")
-                if folder and (
-                    not self.active
-                    or folder
-                    not in (self.active["folder"], self.active.get("layout_folder"))
-                ):
-                    shutil.rmtree(folder, ignore_errors=True)
+                self._cleanup_job_folder(job)
 
     def close(self) -> None:
         """幂等取消全部作业、关闭音频并等待工作线程回收，释放所有候选与活动引用。"""
@@ -1298,7 +1372,13 @@ class Controller(ScorePlayer):
             self.cancel_job(jid)
         self.audio.close()
         self.pool.shutdown(wait=True, cancel_futures=True)
+        for job in self.jobs.values():
+            self._cleanup_job_folder(job)
         self.candidates.clear()
         self.confirmations.clear()
         self.layout_candidates.clear()
+        with self.semantic_cache_lock:
+            self.semantic_cache.clear()
         self.active = None
+        for job in self.jobs.values():
+            self._cleanup_job_folder(job)
