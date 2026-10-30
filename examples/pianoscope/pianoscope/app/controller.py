@@ -28,6 +28,7 @@ from pianoscope.playback.model import Score
 from pianoscope.playback.player import ScorePlayer, serialized
 from pianoscope.playback.render import audible_notes, render
 from pianoscope.playback.types import PCM, AudibleEvent, Overview, PlaybackConfig
+from pianoscope.practice import PracticeManager
 from pianoscope.score.mapping import json_value
 from pianoscope.score.midi import compile_midi, sound_score
 from pianoscope.score.model import ScoreDocument, parse_score
@@ -66,6 +67,7 @@ class Controller(ScorePlayer):
         self._analysis_cache: Record | None = None
         self.workspace = work_root() / "jobs"
         self.workspace.mkdir(parents=True, exist_ok=True)
+        self.practice = PracticeManager(work_root() / "practice.sqlite3")
 
     def _cached_parse(
         self, source: SourceDocument, settings: Record, cancelled: Cancelled
@@ -769,7 +771,12 @@ class Controller(ScorePlayer):
 
     def get_ui_snapshot(self, include_analysis: bool = False) -> Record:
         """返回一次 UI 所需的传输与可选声音分析快照。"""
-        result: Record = dict(transport=self.get_transport(), analysis=None)
+        transport = self.get_transport()
+        result: Record = dict(
+            transport=transport,
+            analysis=None,
+            practice=self.practice.update(transport),
+        )
         if not include_analysis:
             return result
         key = (
@@ -788,6 +795,39 @@ class Controller(ScorePlayer):
             self._analysis_cache_key = key
         result["analysis"] = dict(self._analysis_cache)
         return result
+
+    def get_midi_inputs(self) -> Record:
+        """列出可用 MIDI 输入设备及当前选择。"""
+        return self.practice.midi_inputs()
+
+    def select_midi_input(self, name: str | None) -> Record:
+        """选择或关闭 MIDI 输入设备。"""
+        return self.practice.select_midi_input(str(name) if name else None)
+
+    async def start_practice(self, options: Record | None = None) -> Record:
+        """启动 MIDI 练习并绑定当前不可变曲目快照。"""
+        if self.plan is None or self.score is None:
+            raise ValueError("请先打开乐谱")
+        options = snapshot_record(options or {})
+        if "midi_port" in options:
+            self.practice.select_midi_input(options.get("midi_port"))
+        transport = await self.play()
+        return self.practice.start(self.plan, self.config, transport)
+
+    async def stop_practice(self) -> Record:
+        """暂停播放并提交当前 MIDI 练习的逐音符报告。"""
+        transport = await self.pause()
+        return self.practice.finish(transport)
+
+    def get_practice_snapshot(self) -> Record:
+        """返回当前练习状态和最近一条匹配结果。"""
+        return self.practice.update(self.get_transport())
+
+    def get_practice_results(
+        self, session_id: str, offset: int = 0, limit: int = 200
+    ) -> Record:
+        """分页读取已完成练习的逐音符结果。"""
+        return self.practice.results_page(str(session_id), offset, limit)
 
     def get_transport(self) -> Record:
         """在基础 DAC 传输状态上附曲目世代、谱面版本与手别确认状态。"""
@@ -1379,6 +1419,7 @@ class Controller(ScorePlayer):
         self.layout_candidates.clear()
         with self.semantic_cache_lock:
             self.semantic_cache.clear()
+        self.practice.close()
         self.active = None
         for job in self.jobs.values():
             self._cleanup_job_folder(job)
