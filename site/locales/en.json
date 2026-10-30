@@ -1,6 +1,7 @@
 {
-  "page_title": "ultralight-py · Native desktop showcase",
-  "page_description": "Explore shabbywu/ultralight-py: Python logic, web interfaces, and native desktop apps. See real demos, screenshots, and source for Emberkeep, PianoScope, and Bridge Lab. Try Ashen Reliquary’s grid inventory and equipment system.",
+  "page_title": "ultralight-py Showcase | Python & JavaScript Desktop Apps",
+  "page_description": "Explore Python desktop apps with web interfaces: games, piano practice, live Python–JavaScript interop, and a Vue inventory. View demos, screenshots, and source.",
+  "og_image_alt": "Bridge Lab showing Python and JavaScript working together in a native desktop window",
   "skip": "Skip to examples",
   "nav_examples": "Examples",
   "nav_start": "Get started",

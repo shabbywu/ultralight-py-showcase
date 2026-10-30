@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import re
 import shutil
 import tempfile
 import unittest
@@ -54,6 +55,42 @@ class BuildTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "identical keys"):
             build_site.build(source, output)
         self.assertEqual((output / "keep.txt").read_text(), "previous build")
+
+    def test_crawl_metadata_and_structured_data(self):
+        output = self.root / "dist"
+        build_site.build(build_site.ROOT / "site", output)
+        self.assertEqual(
+            (output / "robots.txt").read_text(),
+            f"User-agent: *\nAllow: /\nSitemap: {build_site.BASE_URL}/sitemap.xml\n",
+        )
+        build_site.validate_sitemap(build_site.BASE_URL, output)
+        projects, _ = build_site.read_content(build_site.ROOT / "site")
+        for locale in build_site.LOCALES:
+            html = (output / locale / "index.html").read_text()
+            data = json.loads(re.search(
+                r'<script type="application/ld\+json">(.*?)</script>', html, re.S
+            )[1])
+            self.assertEqual(data["url"], f"{build_site.BASE_URL}/{locale}/")
+            self.assertEqual(data["inLanguage"], locale)
+            items = data["mainEntity"]["itemListElement"]
+            self.assertEqual(len(items), len(projects))
+            for index, (item, project) in enumerate(zip(items, projects), 1):
+                self.assertEqual(item["position"], index)
+                self.assertEqual(item["item"]["description"], project["description"][locale])
+            for page in ("index.html", "licenses.html"):
+                content = (output / locale / page).read_text()
+                self.assertIn('<meta name="description" content="', content)
+                self.assertIn('<meta property="og:image" content="https://', content)
+                self.assertIn('name="twitter:card" content="summary_large_image"', content)
+                canonical = build_site.site_url(
+                    build_site.BASE_URL, locale, "" if page == "index.html" else page
+                )
+                self.assertIn(f'rel="canonical" href="{canonical}"', content)
+        malicious = json.loads(json.dumps(projects))
+        malicious[0]["title"] = "</script><script>alert(1)</script>"
+        encoded = build_site.structured_data(build_site.BASE_URL, "en", malicious)
+        self.assertNotIn("</script>", encoded)
+        self.assertEqual(json.loads(encoded)["mainEntity"]["itemListElement"][0]["item"]["name"], malicious[0]["title"])
 
     def test_changed_styles_invalidate_cached_assets_on_every_page(self):
         source = self.source_copy()

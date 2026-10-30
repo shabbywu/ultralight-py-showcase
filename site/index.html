@@ -5,9 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark">
   <meta name="description" content="{{page_description}}">
+  <meta name="author" content="shabbywu">
+  <meta name="robots" content="index, follow, max-image-preview:large">
   <meta property="og:title" content="{{page_title}}">
   <meta property="og:description" content="{{page_description}}">
   <meta property="og:type" content="website">
+  <meta property="og:site_name" content="ultralight-py Showcase">
+  <meta property="og:locale" content="{{OG_LOCALE}}">
+  <meta property="og:image" content="{{OG_IMAGE}}">
+  <meta property="og:image:alt" content="{{og_image_alt}}">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{{page_title}}">
+  <meta name="twitter:description" content="{{page_description}}">
+  <meta name="twitter:image" content="{{OG_IMAGE}}">
   <title>{{page_title}}</title>
   {{SEARCH_METADATA}}
   <link rel="icon" href="{{PREFIX}}assets/favicon.svg" type="image/svg+xml">
@@ -59,6 +69,7 @@ python -m http.server 8000 --directory dist</code></pre><button type="button" cl
 </main>
 <footer class="shell footer"><a href="./">ultralight-py / Showcase</a><span>Python. Web. Native.</span><a href="licenses.html">{{licenses}} ↗</a><span class="footer-note">{{footer_note}}</span></footer>
 <dialog class="lightbox" aria-labelledby="lightbox-title"><div class="lightbox-toolbar"><h2 id="lightbox-title"></h2><button type="button" class="lightbox-close">{{lightbox_close}} <span aria-hidden="true">×</span></button></div><img class="lightbox-image" alt=""><p>{{lightbox_note}} <a class="original-image" href="">{{open_image}} ↗</a></p></dialog>
-<script type="application/json" id="site-messages">{{MESSAGES}}</script>
+  <script type="application/json" id="site-messages">{{MESSAGES}}</script>
+  <script type="application/ld+json">{{STRUCTURED_DATA}}</script>
 </body>
 </html>

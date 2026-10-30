@@ -42,6 +42,39 @@ def search_metadata(base_url: str, locale: str, page: str = "") -> str:
     )
 
 
+def structured_data(base_url: str, locale: str, projects: list[dict]) -> str:
+    items = []
+    for index, project in enumerate(projects, 1):
+        items.append({
+            "@type": "ListItem",
+            "position": index,
+            "item": {
+                "@type": ["SoftwareApplication", "SoftwareSourceCode"],
+                "name": project["title"],
+                "applicationCategory": "DesktopApplication",
+                "description": project["description"][locale],
+                "image": f"{base_url}/{project['image']}",
+                "url": project["source"],
+                "codeRepository": project["source"],
+            },
+        })
+    return json.dumps({
+        "@context": "https://schema.org",
+        "@type": "CollectionPage",
+        "name": "ultralight-py Showcase",
+        "url": site_url(base_url, locale),
+        "inLanguage": locale,
+        "isPartOf": {"@type": "WebSite", "name": "ultralight-py Showcase", "url": base_url},
+        "about": {
+            "@type": "SoftwareSourceCode",
+            "name": "ultralight-py",
+            "codeRepository": "https://github.com/shabbywu/ultralight-py",
+            "programmingLanguage": "Python",
+        },
+        "mainEntity": {"@type": "ItemList", "itemListElement": items},
+    }, ensure_ascii=False).replace("<", "\\u003c")
+
+
 def write_sitemap(base_url: str, output: Path) -> None:
     namespace = "http://www.sitemaps.org/schemas/sitemap/0.9"
     ElementTree.register_namespace("", namespace)
@@ -228,7 +261,7 @@ def license_page(locale: str, prefix: str, t: dict, projects: list[dict], base_u
         + "</section>"
         for p in projects
     )
-    return f'''<!doctype html><html lang="{locale}" data-locale="{locale}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{e(t["license_title"])} · ultralight-py</title>{search_metadata(base_url, locale, "licenses.html")}<link rel="stylesheet" href="{prefix}assets/style.css"><link rel="icon" href="{prefix}assets/favicon.svg"><script src="{prefix}assets/app.js" defer></script></head>
+    return f'''<!doctype html><html lang="{locale}" data-locale="{locale}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="{e(t["license_description"])}"><meta name="author" content="shabbywu"><meta name="robots" content="index, follow"><meta property="og:title" content="{e(t["license_title"])} · ultralight-py"><meta property="og:description" content="{e(t["license_description"])}"><meta property="og:type" content="website"><meta property="og:site_name" content="ultralight-py Showcase"><meta property="og:locale" content="{'zh_CN' if locale == 'zh-CN' else 'en_US'}"><meta property="og:image" content="{e(base_url + '/assets/bridge-lab.png')}"><meta name="twitter:card" content="summary_large_image"><title>{e(t["license_title"])} · ultralight-py</title>{search_metadata(base_url, locale, "licenses.html")}<link rel="stylesheet" href="{prefix}assets/style.css"><link rel="icon" href="{prefix}assets/favicon.svg"><script src="{prefix}assets/app.js" defer></script></head>
 <body><header class="shell bar"><a href="./">← {e(t["back"])}</a><div class="language" role="group" aria-label="{e(t["language"])}">{locale_nav(locale, prefix, "licenses.html")}</div></header><main class="shell license-main"><p class="eyebrow">ULTRALIGHT-PY / SHOWCASE</p><h1>{e(t["license_title"])}</h1><p>{e(t["license_description"])}</p><p>{e(t["license_code"])}</p><div class="license-list">{items}</div></main></body></html>'''
 
 
@@ -297,6 +330,9 @@ def build(source: Path, output: Path) -> None:
             ENTRY="false" if directory else "true",
             PREFIX=prefix,
             SEARCH_METADATA=search_metadata(base_url, locale),
+            OG_LOCALE="zh_CN" if locale == "zh-CN" else "en_US",
+            OG_IMAGE=e(f"{base_url}/assets/bridge-lab.png"),
+            STRUCTURED_DATA=structured_data(base_url, locale, projects),
             LOCALE_NAV=locale_nav(locale, prefix),
             PROJECT_INDEX="".join(
                 f'<a href="#{e(p["id"])}">{i:02}<span>{e(p["title"])}</span></a>'
@@ -313,6 +349,10 @@ def build(source: Path, output: Path) -> None:
             license_page(locale, prefix, t, projects, base_url), encoding="utf-8"
         )
     (output / ".nojekyll").touch()
+    (output / "robots.txt").write_text(
+        f"User-agent: *\nAllow: /\nSitemap: {base_url}/sitemap.xml\n",
+        encoding="utf-8",
+    )
     write_sitemap(base_url, output)
     # Keep stable file paths while invalidating cached assets after an update.
     versions = {

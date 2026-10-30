@@ -1,6 +1,7 @@
 {
-  "page_title": "ultralight-py · 原生桌面示例集",
-  "page_description": "探索 shabbywu/ultralight-py：Python 逻辑、Web 界面与原生桌面。查看 Emberkeep、PianoScope 和 Bridge Lab 的真实动图、截图与源码。 体验 Ashen Reliquary 的网格背包与装备系统。",
+  "page_title": "ultralight-py 示例集 | Python 与 JavaScript 原生桌面应用",
+  "page_description": "探索 ultralight-py 如何让 Python 逻辑与 Web 界面构建原生桌面应用。查看像素地牢 Emberkeep、钢琴练习 PianoScope、Python/JavaScript 桥接实验室及 Vue 网格背包的真实演示、截图与源码。",
+  "og_image_alt": "Bridge Lab 原生桌面窗口中协作运行的 Python 与 JavaScript",
   "skip": "跳到示例",
   "nav_examples": "示例",
   "nav_start": "开始使用",
