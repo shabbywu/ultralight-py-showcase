@@ -115,3 +115,29 @@ def test_loop_fades_are_continuous_across_callback_boundaries():
     # A continuous 5ms envelope changes a DC fixture by at most 1/240 per sample.
     assert np.max(np.abs(np.diff(signal[1024:]))) < 0.003
     a.close()
+
+
+def test_loop_round_changes_when_boundary_reaches_dac():
+    a = Audio()
+    a.stream = Stream()
+    a.ready = a.playing = True
+    a.pcm = np.ones((48000, 2), np.float32) * 0.1
+    a.duration = 1
+    a.loop = dict(enabled=True, a_s=0, b_s=0.5)
+    a.cursor = 24000 - 128
+    a.position = a.cursor / 48000
+    out = np.empty((512, 2), np.float32)
+    a._callback(
+        out,
+        512,
+        SimpleNamespace(outputBufferDacTime=1),
+        SimpleNamespace(output_underflow=False),
+    )
+    assert a.callback_round == 1
+    a.stream.time = 1 + 64 / 48000
+    a.clock()
+    assert a.heard_round == 0
+    a.stream.time = 1 + 256 / 48000
+    a.clock()
+    assert a.heard_round == 1
+    a.close()

@@ -18,3 +18,20 @@ def work_root() -> Path:
         .expanduser()
         .resolve()
     )
+
+
+def data_root() -> Path:
+    """返回跨重启保留的用户数据目录，测试可显式覆盖。"""
+    import sys
+
+    override = os.environ.get("PIANOSCOPE_DATA_DIR")
+    if override:
+        return Path(override).expanduser().resolve()
+    if os.environ.get("PIANOSCOPE_TMP_DIR"):
+        return work_root() / "data"
+    if sys.platform == "darwin":
+        return Path.home() / "Library/Application Support/PianoScope"
+    return (
+        Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local/share"))
+        / "PianoScope"
+    )

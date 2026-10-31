@@ -20,7 +20,7 @@ from pathlib import Path
 
 from pianoscope.app.data import snapshot_record
 from pianoscope.app.dialogs import choose_path, choose_score_path
-from pianoscope.paths import RESOURCES, work_root
+from pianoscope.paths import RESOURCES, data_root, work_root
 from pianoscope.playback.analysis import analyze, overview
 from pianoscope.playback.audio import Audio
 from pianoscope.playback.budget import require_pcm_budget
@@ -67,7 +67,30 @@ class Controller(ScorePlayer):
         self._analysis_cache: Record | None = None
         self.workspace = work_root() / "jobs"
         self.workspace.mkdir(parents=True, exist_ok=True)
-        self.practice = PracticeManager(work_root() / "practice.sqlite3")
+        database = data_root() / "practice.sqlite3"
+        database.parent.mkdir(parents=True, exist_ok=True)
+        legacy = work_root() / "practice.sqlite3"
+        if not database.exists() and legacy.exists():
+            import sqlite3
+
+            with sqlite3.connect(legacy) as source, sqlite3.connect(database) as target:
+                source.backup(target)
+        self.practice = PracticeManager(database)
+        self._midi_preview = None
+        self._practice_task = None
+        self._practice_epoch = 0
+        self._countdown_deadline = 0.0
+        self._audition_config = None
+        self.mode = "audition"
+        self.practice_options = dict(count_in=True, target="all", accompaniment="all")
+        for song in self.practice.store.library():
+            self.library["songs"].append(
+                dict(
+                    name=song["name"],
+                    file_token=self.token_for_path(song["path"]),
+                    missing=not Path(song["path"]).is_file(),
+                )
+            )
 
     def _cached_parse(
         self, source: SourceDocument, settings: Record, cancelled: Cancelled
@@ -113,7 +136,15 @@ class Controller(ScorePlayer):
         path = choose_path(
             auto_cancel=auto_cancel, extensions=["musicxml", "xml", "mxl"], label="乐谱"
         )
-        return self.token_for_path(path) if path else None
+        if path:
+            self.practice.store.remember(str(Path(path).resolve()), Path(path).name)
+            token = self.token_for_path(path)
+            self.library["songs"] = [
+                dict(name=r["name"], file_token=self.token_for_path(r["path"]))
+                for r in self.practice.store.library()
+            ]
+            return token
+        return None
 
     async def choose_score_folder(self, auto_cancel: bool = False) -> Record | None:
         """用原生窗口选择曲库目录并异步扫描；取消返回 None。"""
@@ -148,18 +179,108 @@ class Controller(ScorePlayer):
         directory, files = await asyncio.to_thread(scan)
         if generation != self.folder_generation or self.closed:
             return self.get_score_library()
+        self.practice.store.sources(str(directory))
+        for path in files:
+            self.practice.store.remember(str(path), path.name)
         self.library = dict(
             folder_name=directory.name,
-            songs=[dict(name=p.name, file_token=self.token_for_path(p)) for p in files],
+            songs=[
+                dict(name=r["name"], file_token=self.token_for_path(r["path"]))
+                for r in self.practice.store.library()
+            ],
         )
         return self.get_score_library()
 
     def get_score_library(self) -> Record:
-        """返回曲库记录的深拷贝，避免调用方修改内部路径令牌和列表。"""
+        """返回稳定曲目 ID、临时文件令牌和文件状态，不暴露原路径。"""
+        previous = {str(path): token for token, path in self.paths.items()}
+        songs = []
+        for row in self.practice.store.library():
+            path = row["path"]
+            songs.append(
+                dict(
+                    id=row["id"],
+                    source_id=hashlib.sha256(
+                        str(Path(path).parent).encode()
+                    ).hexdigest(),
+                    last_practiced=row["last_practiced"],
+                    name=row["name"],
+                    file_token=previous.get(path) or self.token_for_path(path),
+                    source_fingerprint=row["fingerprint"],
+                    missing=not Path(path).is_file(),
+                )
+            )
+        self.library["songs"] = songs
+        self.library["sources"] = [
+            dict(id=hashlib.sha256(path.encode()).hexdigest(), name=Path(path).name)
+            for path in self.practice.store.sources()
+        ]
         return copy.deepcopy(self.library)
+
+    async def refresh_library_source(self, source_id: str) -> Record:
+        """只重新扫描已经授权并持久化的文件夹。"""
+        path = next(
+            (
+                p
+                for p in self.practice.store.sources()
+                if hashlib.sha256(p.encode()).hexdigest() == source_id
+            ),
+            None,
+        )
+        if path is None:
+            raise ValueError("文件夹来源已失效")
+        return await self.open_score_folder(path)
+
+    async def get_library_detail(self, token: str) -> Record:
+        """仅解析语义和播放计划，选曲时不合成声音、不排版。"""
+        path = self._path(str(token))
+
+        def read() -> Record:
+            """在工作线程解析有界曲目，并保留原有源校验。"""
+            source = read_source(path)
+            document = self._cached_parse(source, {}, lambda: self.closed)
+            plan = compile_plan(document)
+            return dict(
+                title=document.title,
+                original_name=source.original_name,
+                source_sha256=source.sha256,
+                source_revision=document.revision,
+                duration_s=plan.duration_s,
+                notes_count=len(plan.instances),
+                staff_ids=sorted({n["staff_id"] for n in plan.instances}),
+                voices=sorted(
+                    {n["part_id"] + ":" + n["voice_id"] for n in plan.instances}
+                ),
+            )
+
+        result = await asyncio.to_thread(read)
+        if not str(token).startswith("demo:"):
+            self.practice.store.remember(str(path), path.name, result["source_sha256"])
+        return result
+
+    def remove_library_song(self, token: str) -> Record:
+        """从曲库移除引用，保留原文件与历史。"""
+        self.practice.store.forget(str(self._path(str(token))))
+        return self.get_score_library()
+
+    def relocate_library_song(self, token: str) -> Record | None:
+        """用原生选择器重新定位同内容曲目，拒绝错误文件。"""
+        old = self._path(str(token))
+        row = next(
+            (r for r in self.practice.store.library() if r["path"] == str(old)), None
+        )
+        path = choose_path(extensions=["musicxml", "xml", "mxl"], label="重新定位乐谱")
+        if not path or row is None:
+            return None
+        source = read_source(path)
+        if row["fingerprint"] and row["fingerprint"] != source.sha256:
+            raise ValueError("所选文件内容不同，请通过打开乐谱加入新曲目")
+        self.practice.store.relocate(str(old), str(Path(path).resolve()))
+        return self.get_score_library()
 
     def begin_score_load(self, token: str, settings: Record | None = None) -> Record:
         """解析文件令牌并启动候选曲目作业，返回 job_id 与世代。"""
+        self._require_unlocked()
         path = self._path(str(token))
         return self._begin_load(path, settings or {})
 
@@ -227,7 +348,22 @@ class Controller(ScorePlayer):
                     )
                 job["phase"] = "compiling"
                 started = time.perf_counter()
-                plan = compile_plan(document, settings, check)
+                saved_hands = self.practice.store.preference("hands:" + source.sha256)
+                plan = compile_plan(
+                    document,
+                    dict(settings, hands=saved_hands) if saved_hands else settings,
+                    check,
+                )
+                if saved_hands:
+                    for note in plan.instances:
+                        note["hand"] = saved_hands.get(
+                            note["element_ids"][0], "unassigned"
+                        )
+                        note["hand_source"] = (
+                            "confirmed_source_label"
+                            if note["hand"] != "unassigned"
+                            else "unknown"
+                        )
                 job["timings"]["plan_s"] = time.perf_counter() - started
                 started = time.perf_counter()
                 compile_midi(plan)
@@ -268,6 +404,7 @@ class Controller(ScorePlayer):
                     overview=waveform,
                     config=config,
                     sample_rate=rendered_sample_rate,
+                    hands=saved_hands or {},
                 )
 
         job["future"] = self.pool.submit(work)
@@ -661,7 +798,7 @@ class Controller(ScorePlayer):
             raise
         c["job_id"] = job_id
         self.active = c
-        self.hands, self.hand_history, self.hand_preview = {}, [], None
+        self.hands, self.hand_history, self.hand_preview = c["hands"], [], None
         self.configuration_generation += 1
         self.jobs[job_id].update(done=True, phase="completed")
         del self.candidates[job_id]
@@ -669,6 +806,17 @@ class Controller(ScorePlayer):
         c.pop("pcm", None)
         if old:
             old.pop("pcm", None)
+        source = self.plan.document.source
+        for path in self.paths.values():
+            if path.name == source.original_name and any(
+                r["path"] == str(path) for r in self.practice.store.library()
+            ):
+                self.practice.store.remember(
+                    str(path), self.plan.document.title, source.sha256
+                )
+                break
+        self._audition_config = None
+        self.practice.state = "idle"
         return self.get_document()
 
     def get_document(self) -> Record | None:
@@ -798,36 +946,280 @@ class Controller(ScorePlayer):
 
     def get_midi_inputs(self) -> Record:
         """列出可用 MIDI 输入设备及当前选择。"""
-        return self.practice.midi_inputs()
+        result = self.practice.midi_inputs()
+        if self.practice.state not in ("playing", "countdown", "preparing"):
+            for event in self.practice.midi.drain():
+                if event.kind == "note_on":
+                    self._midi_preview = dict(
+                        pitch=event.pitch, velocity=event.velocity
+                    )
+        result["latest_input"] = self._midi_preview
+        return result
 
     def select_midi_input(self, name: str | None) -> Record:
         """选择或关闭 MIDI 输入设备。"""
         return self.practice.select_midi_input(str(name) if name else None)
 
+    def _require_unlocked(self) -> None:
+        """活动练习期间禁止改变不可变目标和时间轴。"""
+        if self.practice.state in ("playing", "paused", "preparing", "countdown"):
+            raise ValueError("请先结束练习，再调整配置或定位")
+
+    async def seek(
+        self, seconds: float, expected_playback_revision: str | None = None
+    ) -> Record:
+        """仅在练习未运行时允许定位。"""
+        self._require_unlocked()
+        return await super().seek(seconds, expected_playback_revision)
+
+    async def set_loop(self, enabled: bool, a_s: float, b_s: float) -> Record:
+        """仅在练习未运行时改变循环区间。"""
+        self._require_unlocked()
+        return await super().set_loop(enabled, a_s, b_s)
+
+    def set_mode(self, mode: str, options: Record | None = None) -> Record:
+        """设置统一播放模式及独立的目标和伴奏偏好。"""
+        if self.practice.state in ("playing", "paused", "countdown", "preparing"):
+            raise ValueError("请先结束当前练习")
+        if mode not in ("audition", "practice"):
+            raise ValueError("未知模式")
+        if self.audio.playing:
+            raise ValueError("请先暂停播放，再切换模式")
+        options = snapshot_record(options or {})
+        if options.get("target", "all") not in (
+            "all",
+            "left",
+            "right",
+            "custom",
+        ) or options.get("accompaniment", "all") not in (
+            "all",
+            "other",
+            "none",
+            "custom",
+        ):
+            raise ValueError("练习范围无效")
+        self.mode = mode
+        self.practice_options.update(options)
+        return dict(mode=self.mode, options=self.practice_options)
+
+    def get_practice_history(self, fingerprint: str = "", offset: int = 0) -> Record:
+        """查询曲目历史与未关联历史。"""
+        return self.practice.store.history(str(fingerprint), int(offset))
+
+    async def play(self) -> Record:
+        """由共用播放入口启动或继续试听与 MIDI 练习。"""
+        if self.mode != "practice":
+            if self._audition_config is not None:
+                saved, self._audition_config = self._audition_config, None
+                await self.configure(saved)
+            return await super().play()
+        if self.practice.state == "paused":
+            self.practice.midi.drain(4096)
+            self.practice.state = "playing"
+            return await super().play()
+        if self.practice.state == "playing":
+            return self.get_transport()
+        if self.practice.state in ("countdown", "preparing"):
+            return self.get_transport()
+        self._practice_epoch += 1
+        epoch = self._practice_epoch
+        self.practice.state = "preparing"
+        try:
+            return await self._prepare_practice(epoch)
+        except BaseException:
+            if epoch == self._practice_epoch:
+                self.practice.state = "idle"
+            raise
+
+    async def _prepare_practice(self, epoch: int) -> Record:
+        """准备独立伴奏、可取消倒计时和练习快照。"""
+        device = self.practice.midi.status()
+        if not device["opened"]:
+            raise ValueError("请先在首页连接 MIDI 输入设备")
+        if self.plan is None:
+            raise ValueError("请先选择曲目")
+        target = self.practice_options.get("target", "all")
+        selected = [
+            n["id"]
+            for n in self.plan.instances
+            if (
+                target in ("all", "custom")
+                or self.hands.get(n["element_ids"][0]) == target
+            )
+            and (
+                target != "custom"
+                or self.practice_options.get("staff_ids") is None
+                or n["staff_id"] in self.practice_options["staff_ids"]
+            )
+            and (
+                target != "custom"
+                or self.practice_options.get("voice_ids") is None
+                or n["part_id"] + ":" + n["voice_id"]
+                in self.practice_options["voice_ids"]
+            )
+        ]
+        if not selected:
+            raise ValueError("练习目标为空，请确认左右手分配或选择全部")
+        loop = self.audio.loop
+        options = self.practice_options
+        a, b = (
+            (loop["a_s"], loop["b_s"])
+            if loop["enabled"]
+            else (
+                float(options.get("range_a_s", 0)),
+                float(options.get("range_b_s", self.plan.duration_s)),
+            )
+            if options.get("range_enabled")
+            else (0, self.plan.duration_s)
+        )
+        if not 0 <= a < b <= self.plan.duration_s or b - a < 0.5:
+            raise ValueError("练习片段至少 0.5 秒且不能超出曲目")
+        if not any(
+            n["id"] in selected and a <= n["onset_s"] < b for n in self.plan.instances
+        ):
+            raise ValueError("练习片段内没有目标音符")
+        accompaniment = self.practice_options.get("accompaniment", "all")
+        if self._audition_config is None:
+            self._audition_config = {
+                k: self.config.get(k)
+                for k in ("rate", "hand_mode", "staff_ids", "voice_ids")
+            }
+        audible = [
+            n["id"]
+            for n in self.plan.instances
+            if accompaniment == "all"
+            or accompaniment == "other"
+            and n["id"] not in selected
+            or accompaniment == "custom"
+            and (
+                self.practice_options.get("accompaniment_staff_ids") is None
+                or n["staff_id"] in self.practice_options["accompaniment_staff_ids"]
+            )
+            and (
+                self.practice_options.get("accompaniment_voice_ids") is None
+                or n["part_id"] + ":" + n["voice_id"]
+                in self.practice_options["accompaniment_voice_ids"]
+            )
+        ]
+        await self.configure(dict(hand_mode="both", allowed_note_ids=audible))
+        if epoch != self._practice_epoch:
+            return self.get_transport()
+        await super().seek(a)
+        self.practice.state = "countdown"
+        self._countdown_deadline = time.monotonic() + (
+            3 if self.practice_options.get("count_in", True) else 0
+        )
+        while time.monotonic() < self._countdown_deadline:
+            await asyncio.sleep(0.05)
+            if epoch != self._practice_epoch:
+                return self.get_transport()
+        config = dict(self.config, allowed_note_ids=selected)
+        self.practice.midi.drain(4096)
+        config.update(title=self.plan.document.title, device=device["selected"])
+        config["practice_options"] = snapshot_record(self.practice_options)
+        self.practice.state = "idle"
+        transport = await super().play()
+        self.practice.start(self.plan, config, transport)
+        self.practice.metadata.update(
+            title=self.plan.document.title, device=device["selected"]
+        )
+        if self._practice_task is None or self._practice_task.done():
+            self._practice_task = asyncio.create_task(self._practice_tick())
+        return self.get_transport()
+
+    async def _practice_tick(self) -> None:
+        """后台推进 MIDI 判定，不依赖页面轮询或可见性。"""
+        try:
+            checked = saved = time.monotonic()
+            while not self.closed and self.practice.state in ("playing", "paused"):
+                transport = self.get_transport()
+                if self.practice.state == "playing":
+                    self.practice.update(transport)
+                    if (
+                        self.practice.state == "playing"
+                        and not self.practice.metadata["loop_enabled"]
+                        and transport["position_s"]
+                        >= self.practice.metadata["loop_b_s"]
+                    ):
+                        await super().pause()
+                        transport.update(
+                            phase="ended", position_s=self.practice.metadata["loop_b_s"]
+                        )
+                        self.practice.finish(transport)
+                        self.phase = "ended"
+                    if transport["phase"] == "error":
+                        self.practice.state = "paused"
+                    if (
+                        self.practice.state == "playing"
+                        and time.monotonic() - saved >= 1
+                    ):
+                        self.practice._flush("playing")
+                        saved = time.monotonic()
+                if time.monotonic() - checked >= 1:
+                    device = self.practice.midi.status()
+                    names = [
+                        r["name"]
+                        for r in self.practice.midi.list_inputs().get("inputs", [])
+                    ]
+                    if not device["opened"] or device["selected"] not in names:
+                        await self.pause()
+                    checked = time.monotonic()
+                await asyncio.sleep(0.02)
+        except asyncio.CancelledError:
+            pass
+        except Exception:
+            self.practice.finish(self.get_transport(), "interrupted")
+
+    async def pause(self) -> Record:
+        """暂停统一传输，保留练习会话。"""
+        transport = await super().pause()
+        if self.practice.state == "playing":
+            self.practice.update(transport)
+            self.practice.state = "paused"
+        return transport
+
+    async def stop(self) -> Record:
+        """停止统一传输并保存练习结果。"""
+        self._practice_epoch += 1
+        if self.practice.state in ("preparing", "countdown"):
+            self.practice.state = "idle"
+        transport = await super().pause()
+        if self.practice.state in ("playing", "paused"):
+            self.practice.update(transport)
+            self.practice.finish(transport)
+        return await super().stop()
+
     async def start_practice(self, options: Record | None = None) -> Record:
-        """启动 MIDI 练习并绑定当前不可变曲目快照。"""
-        if self.plan is None or self.score is None:
-            raise ValueError("请先打开乐谱")
+        """兼容旧入口，通过统一播放开始练习。"""
         options = snapshot_record(options or {})
         if "midi_port" in options:
-            self.practice.select_midi_input(options.get("midi_port"))
-        transport = await self.play()
-        return self.practice.start(self.plan, self.config, transport)
+            self.practice.select_midi_input(options["midi_port"])
+        self.set_mode("practice", options)
+        await self.play()
+        return self.get_practice_snapshot()
 
     async def stop_practice(self) -> Record:
-        """暂停播放并提交当前 MIDI 练习的逐音符报告。"""
-        transport = await self.pause()
-        return self.practice.finish(transport)
+        """兼容旧入口，通过统一停止保存练习。"""
+        await self.stop()
+        return self.get_practice_snapshot()
 
     def get_practice_snapshot(self) -> Record:
         """返回当前练习状态和最近一条匹配结果。"""
         return self.practice.update(self.get_transport())
 
     def get_practice_results(
-        self, session_id: str, offset: int = 0, limit: int = 200
+        self,
+        session_id: str,
+        offset: int = 0,
+        limit: int = 200,
+        filters: Record | None = None,
     ) -> Record:
-        """分页读取已完成练习的逐音符结果。"""
-        return self.practice.results_page(str(session_id), offset, limit)
+        """按轮次与判定类型分页读取历史结果。"""
+        result = self.practice.store.results(
+            str(session_id), offset, limit, snapshot_record(filters or {})
+        )
+        result["comparison"] = self.practice.store.comparison(str(session_id))
+        return result
 
     def get_transport(self) -> Record:
         """在基础 DAC 传输状态上附曲目世代、谱面版本与手别确认状态。"""
@@ -840,6 +1232,12 @@ class Controller(ScorePlayer):
             else None,
             hand_mode=self.config["hand_mode"] if self.config else "both",
             hand_status="confirmed" if self.hands else "unassigned",
+            mode=self.mode,
+            practice_locked=self.practice.state
+            in ("playing", "paused", "preparing", "countdown"),
+            countdown_remaining=max(0, self._countdown_deadline - time.monotonic())
+            if self.practice.state == "countdown"
+            else None,
         )
 
     def _same_audio(self, next_score: Score, next_config: PlaybackConfig) -> bool:
@@ -882,9 +1280,12 @@ class Controller(ScorePlayer):
             raise ValueError("请先打开乐谱")
         if self.current_job and not self.jobs[self.current_job]["done"]:
             raise ValueError("请先完成或取消乐谱准备，再更改试听")
+        if self.practice.state in ("playing", "paused", "countdown"):
+            raise ValueError("请先结束练习，再调整配置")
         changes = snapshot_record(changes)
         if any(
-            k not in ("rate", "hand_mode", "staff_ids", "voice_ids") for k in changes
+            k not in ("rate", "hand_mode", "staff_ids", "voice_ids", "allowed_note_ids")
+            for k in changes
         ):
             raise ValueError("未知试听设置")
         if changes.get("hand_mode", "both") not in ("both", "left", "right"):
@@ -905,15 +1306,21 @@ class Controller(ScorePlayer):
         config = dict(self.config, **changes)
         if config["rate"] not in (0.5, 0.75, 1.0):
             raise ValueError("仅支持 0.5×／0.75×／1×")
-        config["allowed_note_ids"] = [
-            n["id"]
-            for n in self.plan.instances
-            if (config.get("staff_ids") is None or n["staff_id"] in config["staff_ids"])
-            and (
-                config.get("voice_ids") is None
-                or n["part_id"] + ":" + n["voice_id"] in config["voice_ids"]
-            )
-        ]
+        config["allowed_note_ids"] = changes.get(
+            "allowed_note_ids",
+            [
+                n["id"]
+                for n in self.plan.instances
+                if (
+                    config.get("staff_ids") is None
+                    or n["staff_id"] in config["staff_ids"]
+                )
+                and (
+                    config.get("voice_ids") is None
+                    or n["part_id"] + ":" + n["voice_id"] in config["voice_ids"]
+                )
+            ],
+        )
         self.configuration_generation += 1
         generation = self.configuration_generation
         plan = self.plan
@@ -1078,8 +1485,12 @@ class Controller(ScorePlayer):
             or preview["source_revision"] != self.plan.document.revision
         ):
             raise ValueError("手别预览已过期")
+        self._require_unlocked()
         old = dict(self.hands)
         await self._set_hands(preview["hands"])
+        self.practice.store.preference(
+            "hands:" + self.plan.document.source.sha256, self.hands
+        )
         self.hand_history.append(old)
         self.hand_preview = None
         return self.get_document()
@@ -1172,8 +1583,12 @@ class Controller(ScorePlayer):
         """应用上一份手别快照，成功后移除该撤销记录；无历史时返回当前文档。"""
         if not self.hand_history:
             return self.get_document()
+        self._require_unlocked()
         old = self.hand_history[-1]
         await self._set_hands(old)
+        self.practice.store.preference(
+            "hands:" + self.plan.document.source.sha256, self.hands
+        )
         self.hand_history.pop()
         return self.get_document()
 
@@ -1407,9 +1822,14 @@ class Controller(ScorePlayer):
         """幂等取消全部作业、关闭音频并等待工作线程回收，释放所有候选与活动引用。"""
         if self.closed:
             return
+        self._practice_epoch += 1
+        if self._practice_task is not None:
+            self._practice_task.cancel()
         self.closed = True
         for jid in list(self.jobs):
             self.cancel_job(jid)
+        if self.practice.state in ("playing", "paused"):
+            self.practice.finish(self.get_transport(), "interrupted")
         self.audio.close()
         self.pool.shutdown(wait=True, cancel_futures=True)
         for job in self.jobs.values():

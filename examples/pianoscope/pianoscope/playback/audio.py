@@ -40,6 +40,8 @@ class Audio:
         self.offsets = np.zeros((64, 2), np.int64)
         self.lengths = np.zeros((64, 2), np.int64)
         self.samples_at = np.zeros((64, 2), np.int64)
+        self.rounds_at = np.zeros((64, 2), np.int64)
+        self.heard_round = self.callback_round = 0
         self.entrance = True
         self.fade_cursor = 0
         self.fade_requested = False
@@ -110,6 +112,7 @@ class Audio:
 
     def set_position(self, value: float) -> None:
         """把曲目秒数换算为 PCM 帧位置并使旧时钟历史失效；边界由调用方校验。"""
+        self.heard_round = self.callback_round = 0
         self.position = float(value)
         self.cursor = round(self.position / self.rate * self.sample_rate)
         self._reset_history()
@@ -148,6 +151,8 @@ class Audio:
         if not self.ready or not self.stream:
             raise RuntimeError("未找到声音输出设备")
         self._reset_history()
+        self.callback_round = self.heard_round
+        self.cursor = round(self.position / self.rate * self.sample_rate)
         self.playing = True
         try:
             self.stream.start()
@@ -172,6 +177,7 @@ class Audio:
         epoch = self.epoch
         pcm = self.pcm
         cursor = self.cursor
+        callback_round = self.callback_round
         offset = 0
         a = round(self.loop["a_s"] / self.rate * self.sample_rate)
         b = round(self.loop["b_s"] / self.rate * self.sample_rate)
@@ -185,6 +191,7 @@ class Audio:
             if cursor >= limit:
                 if looping:
                     cursor = a
+                    callback_round += 1
                 else:
                     break
             n = min(frames - offset, limit - cursor)
@@ -192,6 +199,7 @@ class Audio:
             self.offsets[slot, segment_count] = offset
             self.lengths[slot, segment_count] = n
             self.samples_at[slot, segment_count] = cursor
+            self.rounds_at[slot, segment_count] = callback_round
             # Envelope indices derive from source samples, so fades continue
             # across callbacks even when a loop boundary splits a tiny block.
             if looping and cursor < a + fade:
@@ -243,6 +251,7 @@ class Audio:
         if epoch != self.epoch:
             return
         self.cursor = cursor
+        self.callback_round = callback_round
         self.serial += 1
         self.ring[slot] = out
         self.stamps[slot, 1] = epoch
@@ -295,9 +304,10 @@ class Audio:
         for serial, epoch, dac, segments in records:
             if dac > now:
                 break
-            for off, n, start in segments:
+            for segment_index, (off, n, start) in enumerate(segments):
                 if now < dac + off / self.sample_rate:
                     break
+                self.heard_round = int(self.rounds_at[serial % 64, segment_index])
                 played = min(n, max(0, (now - dac) * self.sample_rate - off))
                 sample = start + played
                 pos = min(self.duration, sample / self.sample_rate * self.rate)

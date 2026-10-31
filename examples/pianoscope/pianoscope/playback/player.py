@@ -319,6 +319,7 @@ class ScorePlayer:
         return dict(
             seq=self.seq,
             clock_epoch=self.audio.epoch,
+            loop_round=self.audio.heard_round,
             phase=self.phase,
             position_s=seconds,
             duration_s=plan.duration_s if plan else 0.0,

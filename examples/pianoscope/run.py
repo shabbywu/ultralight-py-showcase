@@ -5,7 +5,6 @@ import argparse
 import asyncio
 import json
 import platform
-import tempfile
 import traceback
 from importlib.metadata import version
 from pathlib import Path
@@ -13,6 +12,7 @@ from pathlib import Path
 from pianoscope.app.bridge import register
 from pianoscope.app.controller import Controller
 from pianoscope.app.dialogs import before_window_close
+from pianoscope.paths import data_root
 
 ROOT = Path(__file__).resolve().parent
 # Poll AppCore frequently enough to service native display/input callbacks.
@@ -49,8 +49,14 @@ def main():
         from ultralight_py import API, Application, Resource
 
         controller = Controller()
+        if args.file:
+            controller.practice.store.remember(
+                str(args.file.expanduser().resolve()), args.file.name
+            )
         source = (
-            controller.token_for_path(args.file) if args.file else "demo:first-light"
+            controller.token_for_path(args.file)
+            if args.file
+            else ("demo:first-light" if args.smoke else None)
         )
         assets = ROOT / "pianoscope/assets"
         resources = {
@@ -66,6 +72,8 @@ def main():
         config = (
             "window.APP_ERRORS=[];window.onerror=function(m,u,l,c){APP_ERRORS.push({message:String(m),url:u,line:l,column:c})};window.CPU_RENDERER="
             + json.dumps(args.cpu)
+            + ";window.START_ON_HOME="
+            + json.dumps(not args.file and not args.smoke)
             + ";window.INITIAL_SOURCE="
             + json.dumps(source)
             + ";"
@@ -79,12 +87,11 @@ def main():
             return Resource(data, "image/png") if data is not None else None
 
         with (
-            tempfile.TemporaryDirectory(prefix="pianoscope-") as cache,
             API("piano") as api,
             Application(
                 assets_root=str(assets),
                 resource_loader=resource_loader,
-                cache_path=cache,
+                cache_path=str(data_root() / "web-profile"),
                 app_name="PianoScope",
                 force_cpu_renderer=args.cpu,
             ) as app,
