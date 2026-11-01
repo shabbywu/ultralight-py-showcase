@@ -68,6 +68,8 @@ def register(api: PianoAPI, controller: Controller) -> None:
         "get_ui_snapshot",
         "get_midi_inputs",
         "select_midi_input",
+        "set_midi_monitor",
+        "silence_midi_monitor",
         "start_practice",
         "stop_practice",
         "get_practice_snapshot",

@@ -5,6 +5,7 @@ from __future__ import annotations
 import queue
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
@@ -18,6 +19,8 @@ class MidiEvent:
     velocity: int
     channel: int
     timestamp_ns: int
+    control: int = 0
+    value: int = 0
 
 
 class MidiInput:
@@ -31,6 +34,8 @@ class MidiInput:
         self._name: str | None = None
         self._error: str | None = None
         self.dropped = 0
+        self.listener: Callable[[MidiEvent], None] | None = None
+        self.on_reset: Callable[[], None] | None = None
 
     @staticmethod
     def _mido() -> Any:
@@ -54,7 +59,7 @@ class MidiInput:
 
     def _callback(self, message: Any) -> None:
         kind = str(getattr(message, "type", ""))
-        if kind not in ("note_on", "note_off"):
+        if kind not in ("note_on", "note_off", "control_change"):
             return
         velocity = int(getattr(message, "velocity", 0))
         if kind == "note_on" and velocity == 0:
@@ -65,11 +70,19 @@ class MidiInput:
             velocity=max(0, min(127, velocity)),
             channel=max(0, min(15, int(getattr(message, "channel", 0)))),
             timestamp_ns=time.monotonic_ns(),
+            control=max(0, min(127, int(getattr(message, "control", 0)))),
+            value=max(0, min(127, int(getattr(message, "value", 0)))),
         )
+        if self.listener is not None:
+            self.listener(event)
+        if kind == "control_change":
+            return
         try:
             self._events.put_nowait(event)
         except queue.Full:
             self.dropped += 1
+            if self.on_reset is not None:
+                self.on_reset()
 
     def select(self, name: str | None) -> dict[str, Any]:
         """Open a named input, or close the current input when name is None."""
@@ -119,3 +132,5 @@ class MidiInput:
                 port.close()
             except Exception:
                 pass
+        if self.on_reset is not None:
+            self.on_reset()

@@ -105,6 +105,14 @@ def main():
                         )
                     print("Persistent storage", stage, "passed")
                     return
+                from pianoscope.practice.midi import MidiEvent
+
+                v.evaluate("document.getElementById('midiMonitor').click()")
+                await v.wait_until(lambda: c.monitor.ready, timeout=15)
+                assert c.plan is None, "home monitoring unexpectedly loaded a score"
+                c.monitor.submit(MidiEvent("note_on", 60, 90, 0, 0))
+                await asyncio.sleep(0.15)
+                c.monitor.submit(MidiEvent("note_off", 60, 0, 0, 0))
                 await v.evaluate_async("document.querySelector('[data-demo]').click()")
                 await v.wait_until(
                     lambda: v.evaluate(
@@ -156,12 +164,14 @@ def main():
                 screenshot(v, out / "practice.png")
                 await v.evaluate_async("piano.pause()")
                 assert c.practice.state == "paused"
+                assert c.monitor.ready, "pausing practice stopped live piano"
                 await v.evaluate_async("piano.play()")
                 assert c.practice.session_id == session
                 await asyncio.sleep(0.15)
                 await v.evaluate_async("piano.stop()")
                 assert c.practice.store.history()["total"] == 1
                 assert c.practice.store.history()["items"][0]["status"] == "stopped"
+                assert c.monitor.ready, "stopping practice stopped live piano"
                 screenshot(v, out / "result.png")
                 v.evaluate("document.getElementById('backLibrary').click()")
                 await v.wait_until(

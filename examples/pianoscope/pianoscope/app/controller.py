@@ -25,6 +25,7 @@ from pianoscope.playback.analysis import analyze, overview
 from pianoscope.playback.audio import Audio
 from pianoscope.playback.budget import require_pcm_budget
 from pianoscope.playback.model import Score
+from pianoscope.playback.monitor import MidiMonitor
 from pianoscope.playback.player import ScorePlayer, serialized
 from pianoscope.playback.render import audible_notes, render
 from pianoscope.playback.types import PCM, AudibleEvent, Overview, PlaybackConfig
@@ -76,6 +77,11 @@ class Controller(ScorePlayer):
             with sqlite3.connect(legacy) as source, sqlite3.connect(database) as target:
                 source.backup(target)
         self.practice = PracticeManager(database)
+        self.monitor = MidiMonitor()
+        self.practice.midi.listener = self.monitor.submit
+        self.practice.midi.on_reset = self.monitor.silence
+        monitor_options = self.practice.store.preference("midi_monitor") or {}
+        self.monitor.volume = monitor_options.get("volume", 0.65)
         self._midi_preview = None
         self._practice_task = None
         self._practice_epoch = 0
@@ -947,6 +953,10 @@ class Controller(ScorePlayer):
     def get_midi_inputs(self) -> Record:
         """列出可用 MIDI 输入设备及当前选择。"""
         result = self.practice.midi_inputs()
+        if not result["opened"] or result.get("selected") not in {
+            row["name"] for row in result.get("inputs", [])
+        }:
+            self.monitor.silence()
         if self.practice.state not in ("playing", "countdown", "preparing"):
             for event in self.practice.midi.drain():
                 if event.kind == "note_on":
@@ -954,7 +964,26 @@ class Controller(ScorePlayer):
                         pitch=event.pitch, velocity=event.velocity
                     )
         result["latest_input"] = self._midi_preview
+        result["monitor"] = self.monitor.status()
         return result
+
+    async def set_midi_monitor(self, enabled: bool, volume: float = 0.65) -> Record:
+        """Enable independent live piano output and persist its volume."""
+        volume = float(volume)
+        if not 0 <= volume <= 1:
+            raise ValueError("演奏音量必须在 0–1 内")
+        self.monitor.volume = volume
+        if enabled and not self.monitor.ready:
+            await asyncio.to_thread(self.monitor.start)
+        elif not enabled:
+            await asyncio.to_thread(self.monitor.close)
+        self.practice.store.preference("midi_monitor", dict(volume=volume))
+        return self.monitor.status()
+
+    def silence_midi_monitor(self) -> Record:
+        """Immediately request live piano all-sound-off."""
+        self.monitor.silence()
+        return self.monitor.status()
 
     def select_midi_input(self, name: str | None) -> Record:
         """选择或关闭 MIDI 输入设备。"""
@@ -1840,6 +1869,7 @@ class Controller(ScorePlayer):
         with self.semantic_cache_lock:
             self.semantic_cache.clear()
         self.practice.close()
+        self.monitor.close()
         self.active = None
         for job in self.jobs.values():
             self._cleanup_job_folder(job)
