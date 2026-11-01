@@ -1332,7 +1332,16 @@ class Controller(ScorePlayer):
                 and any(v not in available for v in changes[key])
             ):
                 raise ValueError("试听范围已过期")
-        config = dict(self.config, **changes)
+        restoring_audition = (
+            self._audition_config is not None
+            and self.practice.state
+            not in ("preparing", "countdown", "playing", "paused")
+        )
+        config = dict(
+            self.config,
+            **(self._audition_config if restoring_audition else {}),
+        )
+        config.update(changes)
         if config["rate"] not in (0.5, 0.75, 1.0):
             raise ValueError("仅支持 0.5×／0.75×／1×")
         config["allowed_note_ids"] = changes.get(
@@ -1367,6 +1376,8 @@ class Controller(ScorePlayer):
                 if cancelled():
                     raise ValueError("试听已过期")
                 self.config = config
+                if restoring_audition:
+                    self._audition_config = None
                 self._rebuild_transport_index()
                 return self.get_transport()
 
@@ -1391,6 +1402,8 @@ class Controller(ScorePlayer):
                         raise ValueError("试听已过期")
                     self.audio.install(pcm, config["rate"], plan.duration_s, position)
                     self.config = config
+                    if restoring_audition:
+                        self._audition_config = None
                     self._rebuild_transport_index()
                     self.active["sample_rate"] = self.audio.sample_rate
                     if self.phase == "playing":

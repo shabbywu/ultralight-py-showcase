@@ -189,7 +189,7 @@ async function audition() {
   if(innerWidth<=1100)sidebar(false);
   const state=appliedPractice(),box=document.createElement('div'),voices=[];
   let selectedStaffs=state.staff_ids.slice();
-  const intro=document.createElement('p');intro.className='hint';intro.textContent='选择要听的谱表。只改变声音，不修改乐谱或导出。';box.appendChild(intro);
+  const intro=document.createElement('p');intro.className='hint';intro.textContent='选择谱表，并勾选要听的声部，两者同时满足才发声。选择“静音”后点击“应用试听”，乐谱播放仍会推进，但不发声。此处只控制试听；练习伴奏请在首页设置，MIDI 键盘发音由独立开关控制。';box.appendChild(intro);
   const section=practiceSection(box,'试听谱表'),status=document.createElement('p');status.className='practice-status';status.setAttribute('role','status');
   function updateStatus(){const hand=state.hand_mode==='left'?'（当前只听左手）':state.hand_mode==='right'?'（当前只听右手）':'';status.textContent=selectedStaffs.length&&voices.some(v=>v.check.checked)?'应用后试听所选部分'+hand+'。':'当前未选声音，应用后将静音。'}
   const options=[['all','全部']];for(let i=0;i<state.staves.length;i++)options.push([String(i),state.staves[i].name]);options.push(['none','静音']);

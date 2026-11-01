@@ -125,6 +125,26 @@ def test_rate_scope_and_hands_do_not_change_source_or_layout(controller):
     assert float(abs(c.audio.pcm).max()) == 0
 
 
+def test_audition_mute_after_practice_is_not_overwritten_on_play(
+    controller, monkeypatch
+):
+    c = controller
+    load(c, FIXTURES / "temporal.musicxml")
+    c._audition_config = {
+        key: c.config.get(key)
+        for key in ("rate", "hand_mode", "staff_ids", "voice_ids")
+    }
+    c.practice.state = "finished"
+    asyncio.run(c.configure({"staff_ids": [], "hand_mode": "both"}))
+    assert c._audition_config is None
+    assert c.config["allowed_note_ids"] == []
+    assert float(abs(c.audio.pcm).max()) == 0
+    monkeypatch.setattr(c.audio, "start", lambda: None)
+    asyncio.run(c.play())
+    assert c.config["staff_ids"] == []
+    assert float(abs(c.audio.pcm).max()) == 0
+
+
 def test_export_snapshot_cancel_overwrite_and_atomic_failure(
     controller, tmp_path, monkeypatch
 ):
