@@ -55,6 +55,7 @@ class Audio:
         self.last_heard_serial = 0
         self.finish_dac = None
         self.device = None
+        self.follow_position: float | None = None
 
     def open(self) -> bool:
         """依次尝试 48000 和 44100 Hz 双声道输出，返回设备是否就绪。
@@ -181,8 +182,14 @@ class Audio:
         offset = 0
         a = round(self.loop["a_s"] / self.rate * self.sample_rate)
         b = round(self.loop["b_s"] / self.rate * self.sample_rate)
-        looping = self.loop["enabled"]
-        limit = b if looping else len(pcm)
+        looping = self.loop["enabled"] and self.follow_position is None
+        limit = (
+            min(len(pcm), round(self.follow_position / self.rate * self.sample_rate))
+            if self.follow_position is not None
+            else b
+            if looping
+            else len(pcm)
+        )
         slot = (self.serial + 1) % 64
         self.stamps[slot, 0] = 0
         segment_count = 0
@@ -258,7 +265,12 @@ class Audio:
         self.stamps[slot, 2] = float(time.outputBufferDacTime)
         self.stamps[slot, 3] = segment_count
         self.stamps[slot, 0] = self.serial
-        if not looping and cursor >= len(pcm) and self.finish_dac is None:
+        if (
+            self.follow_position is None
+            and not looping
+            and cursor >= len(pcm)
+            and self.finish_dac is None
+        ):
             self.finish_dac = (
                 float(time.outputBufferDacTime) + offset / self.sample_rate
             )
@@ -289,6 +301,8 @@ class Audio:
 
         设备断开时停止推进并记录错误；不使用前端或墙上时钟替代播放时钟。
         """
+        if self.follow_position is not None:
+            return self.follow_position, False, False
         if not self.playing or not self.stream:
             return self.position, False, False
         try:

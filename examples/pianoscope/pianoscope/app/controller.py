@@ -30,6 +30,7 @@ from pianoscope.playback.player import ScorePlayer, serialized
 from pianoscope.playback.render import audible_notes, render
 from pianoscope.playback.types import PCM, AudibleEvent, Overview, PlaybackConfig
 from pianoscope.practice import PracticeManager
+from pianoscope.practice.follow import FollowSession, follow_notes
 from pianoscope.score.mapping import json_value
 from pianoscope.score.midi import compile_midi, sound_score
 from pianoscope.score.model import ScoreDocument, parse_score
@@ -84,6 +85,9 @@ class Controller(ScorePlayer):
         self.monitor.volume = monitor_options.get("volume", 0.65)
         self._midi_preview = None
         self._practice_task = None
+        self.follow: FollowSession | None = None
+        self._follow_session_id = None
+        self._follow_task = None
         self._practice_epoch = 0
         self._countdown_deadline = 0.0
         self._audition_config = None
@@ -957,7 +961,10 @@ class Controller(ScorePlayer):
             row["name"] for row in result.get("inputs", [])
         }:
             self.monitor.silence()
-        if self.practice.state not in ("playing", "countdown", "preparing"):
+        if (
+            self.practice.state not in ("playing", "countdown", "preparing")
+            and not self._following()
+        ):
             for event in self.practice.midi.drain():
                 if event.kind == "note_on":
                     self._midi_preview = dict(
@@ -991,7 +998,12 @@ class Controller(ScorePlayer):
 
     def _require_unlocked(self) -> None:
         """活动练习期间禁止改变不可变目标和时间轴。"""
-        if self.practice.state in ("playing", "paused", "preparing", "countdown"):
+        if self._following() or self.practice.state in (
+            "playing",
+            "paused",
+            "preparing",
+            "countdown",
+        ):
             raise ValueError("请先结束练习，再调整配置或定位")
 
     async def seek(
@@ -1008,9 +1020,14 @@ class Controller(ScorePlayer):
 
     def set_mode(self, mode: str, options: Record | None = None) -> Record:
         """设置统一播放模式及独立的目标和伴奏偏好。"""
-        if self.practice.state in ("playing", "paused", "countdown", "preparing"):
+        if self._following() or self.practice.state in (
+            "playing",
+            "paused",
+            "countdown",
+            "preparing",
+        ):
             raise ValueError("请先结束当前练习")
-        if mode not in ("audition", "practice"):
+        if mode not in ("audition", "practice", "follow"):
             raise ValueError("未知模式")
         if self.audio.playing:
             raise ValueError("请先暂停播放，再切换模式")
@@ -1027,6 +1044,11 @@ class Controller(ScorePlayer):
             "custom",
         ):
             raise ValueError("练习范围无效")
+        if self.follow is not None:
+            self.audio.halt()
+            self.audio.follow_position = None
+            self.audio.set_position(self.follow.position)
+            self.follow = None
         self.mode = mode
         self.practice_options.update(options)
         return dict(mode=self.mode, options=self.practice_options)
@@ -1037,7 +1059,17 @@ class Controller(ScorePlayer):
 
     async def play(self) -> Record:
         """由共用播放入口启动或继续试听与 MIDI 练习。"""
-        if self.mode != "practice":
+        if (
+            self.mode == "follow"
+            and self.follow is not None
+            and self.follow.state == "paused"
+        ):
+            self.practice.midi.drain(4096)
+            self.follow.resume(time.monotonic_ns())
+            return self.get_transport()
+        if self.mode == "follow" and self._following():
+            return self.get_transport()
+        if self.mode not in ("practice", "follow"):
             if self._audition_config is not None:
                 saved, self._audition_config = self._audition_config, None
                 await self.configure(saved)
@@ -1104,7 +1136,13 @@ class Controller(ScorePlayer):
         if not 0 <= a < b <= self.plan.duration_s or b - a < 0.5:
             raise ValueError("练习片段至少 0.5 秒且不能超出曲目")
         if not any(
-            n["id"] in selected and a <= n["onset_s"] < b for n in self.plan.instances
+            n["id"] in selected
+            and (
+                n["onset_s"] < b and n["key_off_s"] > a
+                if self.mode == "follow"
+                else a <= n["onset_s"] < b
+            )
+            for n in self.plan.instances
         ):
             raise ValueError("练习片段内没有目标音符")
         accompaniment = self.practice_options.get("accompaniment", "all")
@@ -1136,7 +1174,9 @@ class Controller(ScorePlayer):
         await super().seek(a)
         self.practice.state = "countdown"
         self._countdown_deadline = time.monotonic() + (
-            3 if self.practice_options.get("count_in", True) else 0
+            3
+            if self.mode != "follow" and self.practice_options.get("count_in", True)
+            else 0
         )
         while time.monotonic() < self._countdown_deadline:
             await asyncio.sleep(0.05)
@@ -1147,6 +1187,35 @@ class Controller(ScorePlayer):
         config.update(title=self.plan.document.title, device=device["selected"])
         config["practice_options"] = snapshot_record(self.practice_options)
         self.practice.state = "idle"
+        if self.mode == "follow":
+            self.follow = FollowSession(
+                follow_notes(self.plan, selected),
+                a,
+                b,
+                self.config["rate"],
+                loop["enabled"],
+            )
+            self.follow.advance(time.monotonic_ns())
+            self.audio.follow_position = a
+            self.audio.start()
+            self.phase = "playing"
+            metadata = dict(
+                source_fingerprint=self.plan.document.source.sha256,
+                source_revision=self.plan.document.revision,
+                playback_revision=self.plan.revision,
+                rate=self.config["rate"],
+                hand_mode="both",
+                loop_a_s=a,
+                loop_b_s=b,
+                expected_count=len(self.follow.notes),
+                title=self.plan.document.title,
+                device=device["selected"],
+                mode="follow",
+                options=dict(self.practice_options, mode="follow"),
+            )
+            self._follow_session_id = self.practice.store.create(metadata)
+            self._follow_task = asyncio.create_task(self._follow_tick())
+            return self.get_transport()
         transport = await super().play()
         self.practice.start(self.plan, config, transport)
         self.practice.metadata.update(
@@ -1155,6 +1224,81 @@ class Controller(ScorePlayer):
         if self._practice_task is None or self._practice_task.done():
             self._practice_task = asyncio.create_task(self._practice_tick())
         return self.get_transport()
+
+    def _following(self) -> bool:
+        """Whether an immutable follow session owns the score transport."""
+        return self.follow is not None and self.follow.state in ("playing", "paused")
+
+    def _save_follow(self, status: str) -> None:
+        """Persist non-rhythmic progress separately from timing accuracy."""
+        if self.follow is None or self._follow_session_id is None:
+            return
+        snapshot = self.follow.snapshot()
+        self.practice.store.finish(
+            self._follow_session_id,
+            dict(
+                hit_count=0,
+                miss_count=0,
+                extra_count=0,
+                mean_abs_delta_ms=None,
+                completed_rounds=self.follow.completed_rounds,
+                status=status,
+            ),
+            [],
+        )
+        self.practice.store.follow_progress(self._follow_session_id, snapshot)
+
+    async def _follow_tick(self) -> None:
+        """Drive gated audio independently of page polling, with bounded progress."""
+        checked = saved = time.monotonic()
+        try:
+            while not self.closed and self._following():
+                follow = self.follow
+                if follow.state == "playing":
+                    for event in self.practice.midi.drain(4096):
+                        follow.event(event)
+                    follow.advance(time.monotonic_ns())
+                    if follow.position < (self.audio.follow_position or 0):
+                        self.audio.halt()
+                        self.audio.set_position(follow.position)
+                        self.audio.follow_position = follow.position
+                        self.audio.start()
+                    else:
+                        self.audio.follow_position = follow.position
+                    if follow.state == "finished":
+                        self.audio.halt()
+                        self._save_follow("finished")
+                        self.phase = "ended"
+                        break
+                    if (
+                        not self.audio.ready
+                        or self.audio.stream is None
+                        or not self.audio.stream.active
+                    ):
+                        follow.pause(time.monotonic_ns())
+                    if time.monotonic() - saved >= 1:
+                        self._save_follow("playing")
+                        saved = time.monotonic()
+                if time.monotonic() - checked >= 1:
+                    device = self.practice.midi.status()
+                    names = [
+                        r["name"]
+                        for r in self.practice.midi.list_inputs().get("inputs", [])
+                    ]
+                    if not device["opened"] or device["selected"] not in names:
+                        follow.pause(time.monotonic_ns())
+                        self.audio.follow_position = follow.position
+                        self.monitor.silence()
+                    checked = time.monotonic()
+                await asyncio.sleep(0.005)
+        except asyncio.CancelledError:
+            pass
+        except Exception:
+            if self.follow is not None:
+                self.follow.pause(time.monotonic_ns())
+                self.follow.state = "finished"
+                self._save_follow("interrupted")
+            self.audio.halt()
 
     async def _practice_tick(self) -> None:
         """后台推进 MIDI 判定，不依赖页面轮询或可见性。"""
@@ -1201,6 +1345,10 @@ class Controller(ScorePlayer):
 
     async def pause(self) -> Record:
         """暂停统一传输，保留练习会话。"""
+        if self._following():
+            self.follow.pause(time.monotonic_ns())
+            self.audio.follow_position = self.follow.position
+            return self.get_transport()
         transport = await super().pause()
         if self.practice.state == "playing":
             self.practice.update(transport)
@@ -1209,6 +1357,15 @@ class Controller(ScorePlayer):
 
     async def stop(self) -> Record:
         """停止统一传输并保存练习结果。"""
+        if self._following():
+            self.follow.pause(time.monotonic_ns())
+            self.follow.state = "finished"
+            self._save_follow("stopped")
+        if self._follow_task is not None:
+            self._follow_task.cancel()
+            self._follow_task = None
+        self.audio.follow_position = None
+        self.follow = None
         self._practice_epoch += 1
         if self.practice.state in ("preparing", "countdown"):
             self.practice.state = "idle"
@@ -1253,6 +1410,26 @@ class Controller(ScorePlayer):
     def get_transport(self) -> Record:
         """在基础 DAC 传输状态上附曲目世代、谱面版本与手别确认状态。"""
         result = super().get_transport()
+        follow = (
+            self.follow.snapshot() if self.mode == "follow" and self.follow else None
+        )
+        if follow is not None:
+            result.update(
+                phase="ended"
+                if follow["state"] == "finished"
+                else "paused"
+                if follow["state"] == "paused"
+                else "playing",
+                position_s=follow["position_s"],
+                active_instance_ids=follow["target_ids"],
+                active_element_ids=[
+                    e
+                    for n in self.plan.instances
+                    if n["id"] in follow["target_ids"]
+                    for e in n["element_ids"]
+                ],
+                sustained_instance_ids=[],
+            )
         return dict(
             result,
             generation=self.generation,
@@ -1262,8 +1439,9 @@ class Controller(ScorePlayer):
             hand_mode=self.config["hand_mode"] if self.config else "both",
             hand_status="confirmed" if self.hands else "unassigned",
             mode=self.mode,
-            practice_locked=self.practice.state
-            in ("playing", "paused", "preparing", "countdown"),
+            follow=follow,
+            practice_locked=self._following()
+            or self.practice.state in ("playing", "paused", "preparing", "countdown"),
             countdown_remaining=max(0, self._countdown_deadline - time.monotonic())
             if self.practice.state == "countdown"
             else None,
@@ -1309,7 +1487,11 @@ class Controller(ScorePlayer):
             raise ValueError("请先打开乐谱")
         if self.current_job and not self.jobs[self.current_job]["done"]:
             raise ValueError("请先完成或取消乐谱准备，再更改试听")
-        if self.practice.state in ("playing", "paused", "countdown"):
+        if self._following() or self.practice.state in (
+            "playing",
+            "paused",
+            "countdown",
+        ):
             raise ValueError("请先结束练习，再调整配置")
         changes = snapshot_record(changes)
         if any(
@@ -1782,6 +1964,8 @@ class Controller(ScorePlayer):
 
         准备进行中时拒绝重试；候选预算或生成失败时保留可诊断的错误状态。
         """
+        if self._following():
+            raise ValueError("请先结束跟弹，再重试声音设备")
         if self.current_job and not self.jobs[self.current_job]["done"]:
             raise ValueError("请先完成或取消乐谱准备，再重试设备")
         self.configuration_generation += 1
@@ -1865,6 +2049,11 @@ class Controller(ScorePlayer):
         if self.closed:
             return
         self._practice_epoch += 1
+        if self._following():
+            self.follow.pause(time.monotonic_ns())
+            self._save_follow("interrupted")
+        if self._follow_task is not None:
+            self._follow_task.cancel()
         if self._practice_task is not None:
             self._practice_task.cancel()
         self.closed = True

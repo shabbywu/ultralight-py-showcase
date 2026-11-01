@@ -120,7 +120,18 @@ class PracticeStore:
             db.execute(
                 "CREATE TABLE IF NOT EXISTS library_sources(path TEXT PRIMARY KEY)"
             )
+            db.execute(
+                "CREATE TABLE IF NOT EXISTS follow_progress(session_id TEXT PRIMARY KEY, snapshot_json TEXT NOT NULL)"
+            )
             db.execute("PRAGMA user_version=4")
+
+    def follow_progress(self, session_id: str, snapshot: dict[str, Any]) -> None:
+        """Save finger-practice progress without introducing rhythmic hit scores."""
+        with self._connect() as db:
+            db.execute(
+                "INSERT OR REPLACE INTO follow_progress VALUES(?,?)",
+                (session_id, json.dumps(snapshot, ensure_ascii=False)),
+            )
 
     def preference(self, key: str, value: Any = None) -> Any:
         """读取或保存曲目手别、文件夹来源等后端偏好。"""
@@ -192,10 +203,18 @@ class PracticeStore:
                 "SELECT COUNT(*) FROM practice_sessions" + where, args
             ).fetchone()[0]
         return dict(
-            items=[dict(r) for r in rows],
+            items=[dict(r, follow=self._follow_snapshot(r["id"])) for r in rows],
             total=total,
             next_offset=offset + len(rows) if offset + len(rows) < total else None,
         )
+
+    def _follow_snapshot(self, session_id: str) -> dict[str, Any] | None:
+        with self._connect() as db:
+            row = db.execute(
+                "SELECT snapshot_json FROM follow_progress WHERE session_id=?",
+                (session_id,),
+            ).fetchone()
+            return json.loads(row[0]) if row else None
 
     def comparison(self, session_id: str) -> dict[str, Any] | None:
         """比较相同条件的完整轮次，排除提前停止的末轮。"""
@@ -204,6 +223,8 @@ class PracticeStore:
                 "SELECT * FROM practice_sessions WHERE id=?", (session_id,)
             ).fetchone()
             if current is None or not current["config_json"]:
+                return None
+            if json.loads(current["config_json"]).get("mode") == "follow":
                 return None
 
             def key(row: sqlite3.Row) -> str:

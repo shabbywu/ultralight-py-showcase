@@ -183,6 +183,87 @@ def main():
                 v.evaluate("document.querySelector('#historyRows button').click()")
                 await asyncio.sleep(0.3)
                 screenshot(v, out / "history.png")
+                v.evaluate("document.getElementById('enterWorkspace').click()")
+                await v.wait_until(
+                    lambda: v.evaluate("!document.getElementById('workbench').hidden"),
+                    timeout=10,
+                )
+                v.evaluate(
+                    "App.setView('roll');document.getElementById('followMode').click()"
+                )
+                await v.wait_until(lambda: c.follow is not None, timeout=15)
+                assert c.follow is not None
+                await asyncio.sleep(0.1)
+                follow = c.follow
+                await v.wait_until(
+                    lambda: follow.snapshot()["stage"] == "waiting", timeout=10
+                )
+                position = follow.position
+                v.evaluate(
+                    "window.followModeErrors=[];window.followModeObserver=new MutationObserver(records=>{for(const r of records){if(r.target.id==='auditionMode'&&(r.oldValue||'').split(' ').includes('chosen'))followModeErrors.push('audition was selected during follow')}});followModeObserver.observe(document.getElementById('activityMode'),{subtree:true,attributes:true,attributeFilter:['class'],attributeOldValue:true})"
+                )
+                assert not v.evaluate(
+                    "document.getElementById('workspacePanic').disabled"
+                )
+                v.evaluate(
+                    "document.getElementById('workspacePanic').click();document.getElementById('accompanimentMute').click()"
+                )
+                await v.wait_until(lambda: c.audio.volume == 0, timeout=5)
+                assert c.follow is follow and follow.state == "playing"
+                v.evaluate("document.getElementById('followSettings').click()")
+                await v.wait_until(
+                    lambda: v.evaluate("!document.getElementById('modal').hidden"),
+                    timeout=5,
+                )
+                assert (
+                    v.evaluate("document.getElementById('modalTitle').textContent")
+                    == "跟弹设置"
+                )
+                v.evaluate("document.getElementById('closeModal').click()")
+                v.evaluate(
+                    "App.setView('roll');window.followHeights=[];window.followHeightTimer=setInterval(()=>followHeights.push(document.getElementById('roll').getBoundingClientRect().height),16)"
+                )
+                await asyncio.sleep(0.1)
+                assert follow.position == position, (
+                    "follow advanced without correct keys"
+                )
+                await asyncio.sleep(0.4)
+                heights = v.evaluate(
+                    "clearInterval(followHeightTimer);followHeights", copy=True
+                )
+                assert max(heights) - min(heights) < 1, (
+                    "follow status toggled roll viewport height"
+                )
+                assert not v.evaluate("!!document.getElementById('enterFollow')")
+                assert (
+                    v.evaluate(
+                        "followModeObserver.disconnect();followModeErrors.length"
+                    )
+                    == 0
+                ), "follow transiently selected audition"
+                v.evaluate(
+                    "document.getElementById('message').textContent='请先在首页连接 MIDI 输入设备';document.getElementById('message').hidden=false"
+                )
+                await v.wait_until(
+                    lambda: v.evaluate("document.getElementById('message').hidden"),
+                    timeout=5,
+                )
+                import time
+
+                for pitch in follow.snapshot()["target_pitches"]:
+                    follow.event(
+                        MidiEvent("note_on", pitch, 90, 0, time.monotonic_ns())
+                    )
+                await asyncio.sleep(0.1)
+                assert follow.position > position, "correct held chord did not advance"
+                await c.pause()
+                position = follow.position
+                await asyncio.sleep(0.1)
+                assert follow.position == position, "paused follow advanced"
+                await c.stop()
+                record = c.practice.store.history()["items"][0]
+                assert record["follow"] is not None
+                assert c.practice.store.comparison(record["id"]) is None
                 errors = v.evaluate("APP_ERRORS", copy=True)
                 print(
                     json.dumps(
